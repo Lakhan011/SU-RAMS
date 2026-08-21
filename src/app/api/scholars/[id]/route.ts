@@ -28,7 +28,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const data = await req.json();
     const { 
       scholarId, enrollmentNumber, firstName, lastName, email, phone, country,
-      dateOfBirth, gender, address, schoolId, departmentId, program, status 
+      dateOfBirth, gender, address, schoolId, departmentId, program, status,
+      supervisorId
     } = data;
 
     const updatedScholar = await prisma.scholar.update({

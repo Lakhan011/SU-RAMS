@@ -51,7 +51,7 @@ export async function GET(
     where: { scholarId },
     include: { 
       documents: { orderBy: { documentNo: "asc" } },
-      undertaking: true
+      undertaking: true, verifications: true
     },
   });
   if (!matriculation) {

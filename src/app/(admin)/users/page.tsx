@@ -23,6 +23,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   const [roleFilter, setRoleFilter] = useState('all');
+  const [schoolFilter, setSchoolFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   
@@ -73,6 +74,9 @@ export default function UsersPage() {
     if (roleFilter !== 'all') {
       list = list.filter((u) => u.role?.name === roleFilter);
     }
+    if (schoolFilter !== 'all') {
+      list = list.filter((u) => u.school?.id === schoolFilter);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -82,7 +86,7 @@ export default function UsersPage() {
       );
     }
     return list;
-  }, [users, roleFilter, search]);
+  }, [users, roleFilter, schoolFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
@@ -191,6 +195,26 @@ export default function UsersPage() {
         </button>
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="relative w-full sm:w-64">
+          <select
+            value={schoolFilter}
+            onChange={(e) => {
+              setSchoolFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+          >
+            <option value="all">All Schools</option>
+            {schools.map((school: any) => (
+              <option key={school.id} value={school.id}>
+                {school.schoolName}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </div>
+        </div>
         <div className="relative w-full sm:w-64">
           <select
             value={roleFilter}

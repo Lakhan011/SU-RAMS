@@ -23,9 +23,8 @@ export async function GET(req: NextRequest) {
 
   const supervisors = await prisma.user.findMany({
     where: {
-      role: {
-        name: 'SUPERVISOR'
-      }
+      role: { name: 'SUPERVISOR' },
+      ...(req.nextUrl.searchParams.get('departmentId') ? { departmentId: req.nextUrl.searchParams.get('departmentId')! } : {})
     },
     orderBy: { createdAt: 'desc' }
   });

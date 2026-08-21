@@ -31,10 +31,36 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
 
   const [uploadingDocNo, setUploadingDocNo] = useState<number | null>(null);
   const [uploadingUndertaking, setUploadingUndertaking] = useState(false);
+  const [verificationModal, setVerificationModal] = useState<{isOpen: boolean, stage: "HOD"|"DEAN"|null}>({isOpen: false, stage: null});
+  const [verifying, setVerifying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const undertakingInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (scholarId) { idRef.current = scholarId; fetchData(scholarId); } }, [scholarId]);
+
+  
+  const executeVerification = async () => {
+    if (!verificationModal.stage) return;
+    setVerifying(true);
+    try {
+      const res = await fetch(`/api/scholars/${scholarId}/matriculation/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: verificationModal.stage, status: "VERIFIED" })
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        alert(d.error || "Failed to verify");
+      } else {
+        fetchData(scholarId);
+      }
+    } catch (e) {
+      alert("Error verifying");
+    } finally {
+      setVerifying(false);
+      setVerificationModal({ isOpen: false, stage: null });
+    }
+  };
 
   const fetchData = async (scholarId: string) => {
     try {
@@ -447,6 +473,44 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
              </div>
           </div>
 
+          
+          {/* Official Verifications */}
+          <div className="mb-8 p-6 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Official Verifications</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 rounded-lg border border-gray-100 bg-gray-50 flex flex-col items-center justify-center text-center">
+                <span className="text-xs font-semibold text-gray-500 uppercase mb-2">HOD Verification</span>
+                {matriculation.verifications?.find((v: any) => v.stage === 'HOD') ? (
+                  <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
+                    <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
+                    <span className="text-sm font-bold text-green-700">Verified by HOD</span>
+                  </div>
+                ) : (
+                  currentUser?.rawRole === 'HOD' && scholar?.departmentId === currentUser.departmentId ? (
+                    <button onClick={() => setVerificationModal({isOpen: true, stage: 'HOD'})} className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-hover shadow-sm transition-colors">Verify as HOD</button>
+                  ) : (
+                    <span className="text-sm text-gray-400 font-medium">Pending HOD Verification</span>
+                  )
+                )}
+              </div>
+              <div className="p-4 rounded-lg border border-gray-100 bg-gray-50 flex flex-col items-center justify-center text-center">
+                <span className="text-xs font-semibold text-gray-500 uppercase mb-2">Dean Verification</span>
+                {matriculation.verifications?.find((v: any) => v.stage === 'DEAN') ? (
+                  <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
+                    <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
+                    <span className="text-sm font-bold text-green-700">Verified by Dean</span>
+                  </div>
+                ) : (
+                  currentUser?.rawRole === 'DEAN' && scholar?.schoolId === currentUser.schoolId ? (
+                    <button onClick={() => setVerificationModal({isOpen: true, stage: 'DEAN'})} className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-hover shadow-sm transition-colors">Verify as Dean</button>
+                  ) : (
+                    <span className="text-sm text-gray-400 font-medium">Pending Dean Verification</span>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Verification NB */}
           <div className="mb-8 p-4 bg-gray-100 border border-gray-300 text-sm font-bold text-center">
             <p className="uppercase text-red-600">NB:- Please bring all your documents in original for verification</p>
@@ -465,6 +529,51 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
         </div>
       </div>
       
+    
+      {/* Verification Confirmation Modal */}
+      {verificationModal.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm flex flex-col rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center relative">
+              <button 
+                onClick={() => setVerificationModal({ isOpen: false, stage: null })}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm border border-blue-100">
+                <CheckCircle className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Verify Matriculation
+              </h3>
+              <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+                You are about to officially verify this checklist as <strong>{verificationModal.stage}</strong>. 
+                By proceeding, you confirm all required documents are accurate.
+              </p>
+              
+              <div className="flex flex-row gap-3 mt-2">
+                <button 
+                  onClick={() => setVerificationModal({ isOpen: false, stage: null })}
+                  disabled={verifying}
+                  className="flex-1 py-3 text-sm font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={executeVerification}
+                  disabled={verifying}
+                  className="flex-1 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {verifying ? 'Wait...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }

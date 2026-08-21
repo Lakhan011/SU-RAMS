@@ -19,6 +19,7 @@ export default function ScholarsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [supervisors, setSupervisors] = useState<any[]>([]);
 
   const initialForm = {
     id: '',
@@ -35,12 +36,27 @@ export default function ScholarsPage() {
     schoolId: '',
     departmentId: '',
     program: '',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    supervisorId: ''
   };
   const [formData, setFormData] = useState(initialForm);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  
+  const fetchSupervisors = async (deptId: string) => {
+    try {
+      const res = await fetch(`/api/supervisors?departmentId=${deptId}`);
+      const data = await res.json();
+      if (data.supervisors) setSupervisors(data.supervisors);
+    } catch(e) {}
+  };
+
+  useEffect(() => {
+    if (formData.departmentId) fetchSupervisors(formData.departmentId);
+    else setSupervisors([]);
+  }, [formData.departmentId]);
+  
   const fetchData = async () => {
     try {
       const [scholarsRes, schoolsRes, deptsRes, authRes] = await Promise.all([
@@ -97,7 +113,8 @@ export default function ScholarsPage() {
       schoolId: scholar.schoolId,
       departmentId: scholar.departmentId,
       program: scholar.program || '',
-      status: scholar.status
+      status: scholar.status,
+      supervisorId: scholar.supervisor?.supervisorId || ''
     });
     setIsEditModalOpen(true); setActiveTab('profile');
   };
@@ -460,6 +477,40 @@ export default function ScholarsPage() {
                         <option value="SUSPENDED">Suspended</option>
                       </select>
                     </div>
+
+                    {/* Supervisor Assignment */}
+                    {(() => {
+                      const currentScholar = scholars.find((s: any) => s.id === formData.id);
+                      const isVerified = currentScholar?.matriculation?.verifications?.find((v: any) => v.stage === 'HOD') && currentScholar?.matriculation?.verifications?.find((v: any) => v.stage === 'DEAN');
+                      const isCoordinator = currentUser?.rawRole === 'COORDINATOR' || currentUser?.rawRole === 'SUPER_ADMIN';
+                      
+                      if (!isCoordinator) return null;
+                      
+                      return (
+                        <div className="md:col-span-2 mt-4 p-4 rounded-xl border border-blue-100 bg-blue-50/50">
+                          <h4 className="text-sm font-bold text-slate-800 mb-3">Supervisor Assignment</h4>
+                          <div className="relative">
+                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Assign Supervisor (from same Department)</label>
+                            <select 
+                              value={formData.supervisorId || ''} 
+                              onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })} 
+                              disabled={!isVerified}
+                              className={`w-full px-4 py-2 rounded-lg border ${!isVerified ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-blue-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20'} text-sm`}
+                            >
+                              <option value="">-- Select Supervisor --</option>
+                              {supervisors.map(s => <option key={s.id} value={s.id}>{s.name} ({s.email})</option>)}
+                            </select>
+                            {!isVerified && (
+                              <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
+                                Assignment locked: Requires both HOD and Dean verification first.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   </div>
                 </div>
 
