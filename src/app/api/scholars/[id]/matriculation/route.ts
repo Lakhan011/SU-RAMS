@@ -21,10 +21,10 @@ const DEFAULT_DOCUMENTS = [
   { documentNo: 10, documentName: "M.Phill Mark-sheet (Final Year)" },
   { documentNo: 11, documentName: "M.Phill Degree" },
   { documentNo: 12, documentName: "NET / SLET / GATE (with valid score) / any other equivalent certificate with valid score / M.Phil. Certificate from UGC recognized university - if any" },
-  { documentNo: 13, documentName: "NoC from the organization where currently working for Part-Time candidates." },
+  { documentNo: 13, documentName: "NoC from the organization where currently working for Part-Time Ph.D Scholars." },
   { documentNo: 14, documentName: "School Leaving Certificate / Migration Certificate Original" },
   { documentNo: 15, documentName: "Change of name - if any" },
-  { documentNo: 16, documentName: "Aadhar Card (Student)" },
+  { documentNo: 16, documentName: "Aadhar Card (Ph.D Scholar)" },
   { documentNo: 17, documentName: "Filled in Admission Form with photo" },
   { documentNo: 18, documentName: "4 Passport size Photographs" },
 ];

@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Printer, Save, CheckCircle, Upload, Eye, Download, RefreshCw, AlertCircle, FileText, X } from "lucide-react";
+import { Printer, Save, CheckCircle, Upload, Eye, Download, RefreshCw, AlertCircle, FileText, X, GraduationCap, Calendar, Phone, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 
-export default function ScholarMatriculationPage({ params }: { params: Promise<{ id: string }> }) {
+export default function MatriculationView({ scholarId }: { scholarId: string }) {
   const router = useRouter();
   const idRef = useRef<string | null>(null);
   
@@ -14,6 +14,8 @@ export default function ScholarMatriculationPage({ params }: { params: Promise<{
   const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [scholar, setScholar] = useState<any>(null);
+  
+  
   
   const [matriculation, setMatriculation] = useState<any>({
     mode: "FULL_TIME",
@@ -32,53 +34,54 @@ export default function ScholarMatriculationPage({ params }: { params: Promise<{
   const fileInputRef = useRef<HTMLInputElement>(null);
   const undertakingInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    params.then(({ id }) => {
-      idRef.current = id;
-      fetchData(id);
-    });
-  }, [params]);
+  useEffect(() => { if (scholarId) { idRef.current = scholarId; fetchData(scholarId); } }, [scholarId]);
 
   const fetchData = async (scholarId: string) => {
     try {
       const [authRes, scholarRes, matriculationRes] = await Promise.all([
         fetch("/api/auth/me"),
         fetch("/api/scholars"),
-        fetch(`/api/scholars/${scholarId}/matriculation`)
-      ]);
+        fetch(`/api/scholars/${scholarId}/matriculation`),
+        ]);
 
-      if (authRes.ok) {
-        const user = await authRes.json();
-        setCurrentUser(user);
-      }
+      const safeJson = async (res: Response) => {
+        if (!res.ok) return null;
+        try { return await res.json(); } catch { return null; }
+      };
 
-      if (scholarRes.ok) {
-        const data = await scholarRes.json();
-        const found = data.scholars?.find((s: any) => s.id === scholarId);
+      const authData = await safeJson(authRes);
+      if (authData) setCurrentUser(authData);
+
+      const scholarData = await safeJson(scholarRes);
+      if (scholarData?.scholars) {
+        const found = scholarData.scholars.find((s: any) => s.id === scholarId);
         if (found) setScholar(found);
       }
 
-      if (matriculationRes.ok) {
-        const data = await matriculationRes.json();
-        if (data.matriculation) {
-          setMatriculation({
-            ...data.matriculation,
-            documents: data.matriculation.documents || data.defaultDocuments,
-            date: data.matriculation.date ? new Date(data.matriculation.date).toISOString().split("T")[0] : "",
-          });
-        } else {
-          setMatriculation((prev: any) => ({
-            ...prev,
-            documents: data.defaultDocuments || [],
-          }));
-        }
+      const matriculationData = await safeJson(matriculationRes);
+      if (matriculationData?.matriculation) {
+        setMatriculation({
+          ...matriculationData.matriculation,
+          documents: matriculationData.matriculation.documents || matriculationData.defaultDocuments,
+          date: matriculationData.matriculation.date ? new Date(matriculationData.matriculation.date).toISOString().split("T")[0] : "",
+        });
+      } else if (matriculationData?.defaultDocuments) {
+        setMatriculation((prev: any) => ({
+          ...prev,
+          documents: matriculationData.defaultDocuments,
+        }));
       }
     } catch (e) {
+      console.error("Fetch Data Error:", e);
       toast.error("Failed to load data");
     } finally {
       setLoading(false);
     }
   };
+
+  
+
+  
 
   const handlePrint = () => {
     window.print();
@@ -262,13 +265,11 @@ export default function ScholarMatriculationPage({ params }: { params: Promise<{
         <input type="file" ref={undertakingInputRef} onChange={(e) => handleFileUpload(e, true)} accept=".pdf,.jpg,.jpeg,.png" />
       </div>
 
-      <div className="max-w-5xl mx-auto py-8 px-4 space-y-6 print-section">
+      <div className="w-full mx-auto py-4 px-2 space-y-6 print-section">
         
         {/* Header Actions (No Print) */}
         <div className="flex items-center justify-between no-print mb-6">
-          <button onClick={() => router.back()} className="text-muted hover:text-foreground flex items-center gap-2 text-sm font-medium">
-            <X className="w-4 h-4" /> Close
-          </button>
+          
           <div className="flex items-center gap-3">
 
 
@@ -280,8 +281,11 @@ export default function ScholarMatriculationPage({ params }: { params: Promise<{
 
 
           {/* Scholar Info */}
-          <div className="mb-8">
-            <h4 className="text-sm font-bold uppercase bg-gray-100 p-2 mb-4 border border-gray-300">Ph.D. Scholar Information</h4>
+          <div className="mb-8 relative">
+            <div className="flex items-center justify-between bg-gray-100 p-2 mb-4 border border-gray-300">
+              <h4 className="text-sm font-bold uppercase">Ph.D. Scholar Information</h4>
+              
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm">
               <div className="flex border-b border-gray-200 pb-2">
                 <span className="font-bold w-40">Scholar Name:</span>
@@ -415,7 +419,7 @@ export default function ScholarMatriculationPage({ params }: { params: Promise<{
                   <AlertCircle className="w-8 h-8 text-orange-500" />
                 </div>
                 <div className="flex-1 text-sm text-gray-700">
-                  <p><strong>Note:</strong> If any of the above-mentioned document has not been produced/submitted, the candidate has to furnish an undertaking for Matriculation.</p>
+                  <p><strong>Note:</strong> If any of the above-mentioned document has not been produced/submitted, the Ph.D Scholar has to furnish an undertaking for Matriculation.</p>
                 </div>
                 <div className="flex-shrink-0 no-print">
                   {matriculation.undertaking ? (
@@ -460,6 +464,7 @@ export default function ScholarMatriculationPage({ params }: { params: Promise<{
 
         </div>
       </div>
+      
     </>
   );
 }

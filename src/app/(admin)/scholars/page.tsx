@@ -1,6 +1,7 @@
 'use client';
 
-import { Plus, Search, Edit, Trash2, X, GraduationCap, Phone, Mail, Calendar, User, BookOpen, ClipboardCheck } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, GraduationCap, Phone, Mail, Calendar, User, BookOpen, FileCheck } from 'lucide-react';
+import MatriculationView from '@/components/scholars/MatriculationView';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -14,6 +15,7 @@ export default function ScholarsPage() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'matriculation'>('profile');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +78,7 @@ export default function ScholarsPage() {
       presetSchoolId = currentUser.schoolId;
     }
     setFormData({ ...initialForm, schoolId: presetSchoolId });
-    setIsModalOpen(true);
+    setIsModalOpen(true); setActiveTab('profile');
   };
 
   const openEditModal = (scholar: any) => {
@@ -97,7 +99,7 @@ export default function ScholarsPage() {
       program: scholar.program || '',
       status: scholar.status
     });
-    setIsEditModalOpen(true);
+    setIsEditModalOpen(true); setActiveTab('profile');
   };
   const confirmDelete = (id: string) => {
     setDeletingId(id);
@@ -142,11 +144,15 @@ export default function ScholarsPage() {
         toast.error(data.error || 'Failed to save scholar');
       } else {
         toast.success(isEdit ? 'Scholar updated successfully!' : 'Scholar added successfully!');
-        setIsModalOpen(false);
-        setIsEditModalOpen(false);
         fetchData();
         if (!isEdit && data.scholar?.id) {
-          router.push(`/scholars/${data.scholar.id}/matriculation`);
+          setFormData(prev => ({ ...prev, id: data.scholar.id }));
+          setIsModalOpen(false);
+          setIsEditModalOpen(true);
+          setActiveTab('matriculation');
+        } else {
+          setIsModalOpen(false);
+          setIsEditModalOpen(false);
         }
       }
     } catch (e) {
@@ -226,13 +232,6 @@ export default function ScholarsPage() {
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button 
-                          onClick={() => router.push(`/scholars/${scholar.id}/matriculation`)}
-                          title="Matriculation Checklist"
-                          className="p-2 text-muted hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
-                        >
-                          <ClipboardCheck className="w-4 h-4" />
-                        </button>
-                        <button 
                           onClick={() => openEditModal(scholar)}
                           className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
                         >
@@ -257,23 +256,54 @@ export default function ScholarsPage() {
       {/* Add/Edit Scholar Modal */}
       {(isModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-surface w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/50 shrink-0">
-              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-primary" />
-                {isEditModalOpen ? 'Edit Scholar Profile' : 'Add New Scholar'}
-              </h3>
-              <button 
-                onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }}
-                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+          <div className="bg-surface w-full max-w-5xl max-h-[95vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white shadow-sm shrink-0 relative z-10">
+              <div className="flex-1 flex items-center">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                  </div>
+                  {isEditModalOpen ? 'Edit Scholar' : 'New Scholar'}
+                </h3>
+              </div>
+              
+              <div className="shrink-0 flex justify-center mx-4">
+                <div className="flex bg-slate-100 p-1 rounded-[10px] border border-slate-200/60 shadow-inner w-fit">
+                  <button
+                    type="button"
+                    className={`py-1.5 px-4 text-sm font-semibold rounded-md flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'profile' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                    onClick={() => setActiveTab('profile')}
+                  >
+                    <User className="w-4 h-4" />
+                    Profile Details
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!formData.id}
+                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'matriculation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    onClick={() => formData.id && setActiveTab('matriculation')}
+                    title={!formData.id ? "Please create the scholar first to unlock matriculation" : ""}
+                  >
+                    <FileCheck className="w-4 h-4" />
+                    Matriculation Checklist
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 flex justify-end">
+                <button 
+                  onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            
+
+            {activeTab === 'profile' ? (
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* Academic Identity */}
                 <div className="space-y-4 md:col-span-2">
@@ -453,10 +483,12 @@ export default function ScholarsPage() {
                 </button>
               </div>
             </form>
+            ) : (
+              <div className="flex-1 overflow-y-auto"><MatriculationView scholarId={formData.id} /></div>
+            )}
           </div>
         </div>
       )}
-
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
