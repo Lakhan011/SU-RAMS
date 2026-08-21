@@ -481,7 +481,7 @@ export default function ScholarsPage() {
                     {/* Supervisor Assignment */}
                     {(() => {
                       const currentScholar = scholars.find((s: any) => s.id === formData.id);
-                      const isVerified = currentScholar?.matriculation?.verifications?.find((v: any) => v.stage === 'HOD') && currentScholar?.matriculation?.verifications?.find((v: any) => v.stage === 'DEAN');
+                      const isVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'HOD') && currentScholar?.verifications?.find((v: any) => v.stage === 'DEAN');
                       const isCoordinator = currentUser?.rawRole === 'COORDINATOR' || currentUser?.rawRole === 'SUPER_ADMIN';
                       
                       if (!isCoordinator) return null;

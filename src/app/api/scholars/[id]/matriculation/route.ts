@@ -6,13 +6,22 @@ const prisma = new PrismaClient();
 const secretKey = process.env.JWT_SECRET || "super-secret-fallback-key-change-in-production";
 const key = new TextEncoder().encode(secretKey);
 
-const ALLOWED_ROLES = ["SUPER_ADMIN", "RDC_ADMIN", "COORDINATOR", "HOD", "DEAN", "SUPERVISOR", "VC"];
+async function checkAuth(req: NextRequest) {
+  const token = req.cookies.get("auth-token")?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, key);
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
 
 const DEFAULT_DOCUMENTS = [
-  { documentNo: 1,  documentName: "10th (Mark-sheet)" },
-  { documentNo: 2,  documentName: "10th (Passing Certificate)" },
-  { documentNo: 3,  documentName: "12th (Mark-sheet)" },
-  { documentNo: 4,  documentName: "12th (Passing Certificate)" },
+  { documentNo: 1,  documentName: "High School Mark-sheet / Certificate" },
+  { documentNo: 2,  documentName: "Intermediate Mark-sheet / Certificate" },
+  { documentNo: 3,  documentName: "Diploma marksheet/certificate (If Applicable)" },
+  { documentNo: 4,  documentName: "Diploma Degree (If Applicable)" },
   { documentNo: 5,  documentName: "Diploma marksheet/certificate" },
   { documentNo: 6,  documentName: "Graduation Mark-sheet (Final Year)" },
   { documentNo: 7,  documentName: "Graduation Degree" },
@@ -29,35 +38,53 @@ const DEFAULT_DOCUMENTS = [
   { documentNo: 18, documentName: "4 Passport size Photographs" },
 ];
 
-async function checkAuth(req: NextRequest) {
-  const token = req.cookies.get("auth-token")?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, key);
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await checkAuth(req);
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  
   const { id: scholarId } = await params;
-  const matriculation = await prisma.matriculation.findUnique({
-    where: { scholarId },
+  
+  const scholar = await prisma.scholar.findUnique({
+    where: { id: scholarId },
     include: { 
-      documents: { orderBy: { documentNo: "asc" } },
-      undertaking: true, verifications: true
+      documents: { 
+        where: { documentType: "MATRICULATION" },
+        orderBy: { documentNo: "asc" } 
+      },
+      undertaking: true, 
+      verifications: true
     },
   });
-  if (!matriculation) {
-    return NextResponse.json({ matriculation: null, defaultDocuments: DEFAULT_DOCUMENTS });
+
+  if (!scholar) {
+    return NextResponse.json({ error: "Scholar not found" }, { status: 404 });
   }
-  return NextResponse.json({ matriculation });
+
+  // Construct matriculation payload to match frontend expectations seamlessly
+  const matriculation = {
+    id: scholar.id, // using scholar id
+    scholarId: scholar.id,
+    mode: scholar.mode || "",
+    date: scholar.matriculationDate,
+    preparedBy: scholar.preparedBy,
+    designation: scholar.designation,
+    verificationStatus: scholar.verificationStatus || "PENDING",
+    originalDocsProduced: scholar.originalDocsProduced,
+    status: scholar.matriculationStatus,
+    submittedBy: scholar.submittedBy,
+    submittedAt: scholar.submittedAt,
+    approvedBy: scholar.approvedBy,
+    approvedAt: scholar.approvedAt,
+    remarks: scholar.matriculationRemarks,
+    documents: scholar.documents,
+    undertaking: scholar.undertaking,
+    verifications: scholar.verifications,
+  };
+
+  return NextResponse.json({ matriculation, defaultDocuments: DEFAULT_DOCUMENTS });
 }
 
 export async function POST(
@@ -65,10 +92,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await checkAuth(req);
+  const ALLOWED_ROLES = ["SUPER_ADMIN", "RDC_ADMIN", "COORDINATOR", "HOD", "DEAN", "SUPERVISOR", "VC"];
+
   if (!auth || !ALLOWED_ROLES.includes(auth.role as string)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  
+
   const { id: scholarId } = await params;
   const data = await req.json();
   const { 
@@ -82,88 +111,98 @@ export async function POST(
       data: {
         userId: auth.id as string,
         action: "UPDATE_MATRICULATION",
-        entity: "Matriculation",
+        entity: "Scholar",
         entityId: scholarId,
       }
     });
 
-    const matriculation = await prisma.matriculation.upsert({
-      where: { scholarId },
-      create: { 
-        scholarId, 
-        mode, 
-        date: date ? new Date(date) : null, 
-        preparedBy, 
-        designation, 
-        verificationStatus, 
-        originalDocsProduced: !!originalDocsProduced,
-        status: "DRAFT" 
-      },
-      update: { 
-        mode, 
-        date: date ? new Date(date) : null, 
-        preparedBy, 
-        designation, 
+    const updatedScholar = await prisma.scholar.update({
+      where: { id: scholarId },
+      data: {
+        mode: mode || null,
+        matriculationDate: date ? new Date(date) : null,
+        preparedBy,
+        designation,
         verificationStatus,
-        originalDocsProduced: !!originalDocsProduced
+        originalDocsProduced: !!originalDocsProduced,
+        matriculationStatus: "DRAFT"
       },
     });
 
     if (documents && Array.isArray(documents)) {
       for (const doc of documents) {
-        await prisma.matriculationDocument.upsert({
-          where: { matriculationId_documentNo: { matriculationId: matriculation.id, documentNo: doc.documentNo } },
-          create: { 
-            matriculationId: matriculation.id, 
-            documentNo: doc.documentNo, 
-            documentName: doc.documentName, 
-            isApplicable: doc.isApplicable ?? false, 
-            isSubmitted: doc.isSubmitted ?? false, 
-            isVerified: doc.isVerified ?? false, 
-            remarks: doc.remarks ?? "",
-            fileName: doc.fileName || null,
-            filePath: doc.filePath || null,
-            fileSize: doc.fileSize || null,
-            mimeType: doc.mimeType || null,
-            uploadedBy: doc.filePath ? (auth.id as string) : null,
-            uploadedAt: doc.filePath ? new Date() : null,
-          },
-          update: { 
-            isApplicable: doc.isApplicable ?? false, 
-            isSubmitted: doc.isSubmitted ?? false, 
-            isVerified: doc.isVerified ?? false, 
-            remarks: doc.remarks ?? "",
-            fileName: doc.fileName !== undefined ? doc.fileName : undefined,
-            filePath: doc.filePath !== undefined ? doc.filePath : undefined,
-            fileSize: doc.fileSize !== undefined ? doc.fileSize : undefined,
-            mimeType: doc.mimeType !== undefined ? doc.mimeType : undefined,
-            uploadedBy: (doc.filePath && !doc.uploadedBy) ? (auth.id as string) : doc.uploadedBy,
-            uploadedAt: (doc.filePath && !doc.uploadedAt) ? new Date() : doc.uploadedAt,
-          },
+        if (!doc.documentNo) continue;
+        
+        const existingDoc = await prisma.scholarDocument.findFirst({
+          where: { scholarId, documentType: "MATRICULATION", documentNo: doc.documentNo }
         });
+
+        if (existingDoc) {
+          await prisma.scholarDocument.update({
+            where: { id: existingDoc.id },
+            data: {
+              documentName: doc.documentName,
+              isApplicable: doc.isApplicable ?? false,
+              isSubmitted: doc.isSubmitted ?? false,
+              fileName: doc.fileName || null,
+              filePath: doc.filePath || "",
+              fileSize: doc.fileSize || null,
+              mimeType: doc.mimeType || null,
+            }
+          });
+        } else {
+          await prisma.scholarDocument.create({
+            data: {
+              scholarId,
+              documentType: "MATRICULATION",
+              documentNo: doc.documentNo,
+              documentName: doc.documentName,
+              isApplicable: doc.isApplicable ?? false,
+              isSubmitted: doc.isSubmitted ?? false,
+              fileName: doc.fileName || null,
+              filePath: doc.filePath || "",
+              fileSize: doc.fileSize || null,
+              mimeType: doc.mimeType || null,
+            }
+          });
+        }
       }
     }
 
-    if (undertaking && undertaking.filePath) {
-      await prisma.undertaking.upsert({
-        where: { matriculationId: matriculation.id },
-        create: {
-          matriculationId: matriculation.id,
-          fileName: undertaking.fileName,
-          filePath: undertaking.filePath,
-          remarks: undertaking.remarks,
-          uploadedBy: auth.id as string,
-        },
-        update: {
-          fileName: undertaking.fileName,
-          filePath: undertaking.filePath,
-          remarks: undertaking.remarks,
-        }
-      });
-    }
+    // Refresh mapped object
+    const finalScholar = await prisma.scholar.findUnique({
+      where: { id: scholarId },
+      include: { 
+        documents: { where: { documentType: "MATRICULATION" }, orderBy: { documentNo: "asc" } },
+        undertaking: true, verifications: true
+      },
+    });
+
+    if (!finalScholar) throw new Error("Scholar not found after update");
+
+    const matriculation = {
+      id: finalScholar.id,
+      scholarId: finalScholar.id,
+      mode: finalScholar.mode || "",
+      date: finalScholar.matriculationDate,
+      preparedBy: finalScholar.preparedBy,
+      designation: finalScholar.designation,
+      verificationStatus: finalScholar.verificationStatus || "PENDING",
+      originalDocsProduced: finalScholar.originalDocsProduced,
+      status: finalScholar.matriculationStatus,
+      submittedBy: finalScholar.submittedBy,
+      submittedAt: finalScholar.submittedAt,
+      approvedBy: finalScholar.approvedBy,
+      approvedAt: finalScholar.approvedAt,
+      remarks: finalScholar.matriculationRemarks,
+      documents: finalScholar.documents,
+      undertaking: finalScholar.undertaking,
+      verifications: finalScholar.verifications,
+    };
 
     return NextResponse.json({ message: "Matriculation checklist saved", matriculation });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Failed to save matriculation checklist" }, { status: 500 });
   }
 }

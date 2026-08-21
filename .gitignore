@@ -56,3 +56,6 @@ next-env.d.ts
 *.njsproj
 *.sln
 *.sw?
+# uploaded files
+public/uploads/*
+!public/uploads/.gitkeep

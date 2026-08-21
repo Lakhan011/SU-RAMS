@@ -60,7 +60,7 @@ model User {
   assignedScholars SupervisorAssignment[]
   auditLogs        AuditLog[]
 
-  verifiedMatriculations MatriculationVerification[]
+  verifiedMatriculations ScholarVerification[]
 }
 
 model School {
@@ -124,6 +124,7 @@ model Scholar {
   schoolId           String
   departmentId       String
   program            String?
+  mode               String?   // FULL_TIME | PART_TIME
   admissionDate      DateTime?
   status             String    @default("ACTIVE")
   createdAt          DateTime  @default(now())
@@ -132,7 +133,20 @@ model Scholar {
   school     School     @relation(fields: [schoolId], references: [id])
   department Department @relation(fields: [departmentId], references: [id])
 
-  matriculation Matriculation?
+  matriculationDate    DateTime?
+  preparedBy           String?
+  designation          String?
+  verificationStatus   String?   // COMPLETE | INCOMPLETE | UNDERTAKING
+  originalDocsProduced Boolean   @default(false)
+  matriculationStatus  String    @default("DRAFT")
+  submittedBy          String?
+  submittedAt          DateTime?
+  approvedBy           String?
+  approvedAt           DateTime?
+  matriculationRemarks String?
+
+  undertaking   Undertaking?
+  verifications ScholarVerification[]
   supervisor    SupervisorAssignment?
   courses       ScholarCourse[]
   documents     ScholarDocument[]
@@ -142,58 +156,11 @@ model Scholar {
   @@index([createdAt])
 }
 
-model Matriculation {
-  id                 String    @id @default(cuid())
-  scholarId          String    @unique
-  mode               String?   // FULL_TIME | PART_TIME
-  date               DateTime?
-  preparedBy         String?
-  designation        String?
-  verificationStatus String?   // COMPLETE | INCOMPLETE | UNDERTAKING
-  originalDocsProduced Boolean @default(false)
-  status             String    @default("DRAFT")
-  submittedBy        String?
-  submittedAt        DateTime?
-  approvedBy         String?
-  approvedAt         DateTime?
-  remarks            String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
 
-  scholar       Scholar                     @relation(fields: [scholarId], references: [id], onDelete: Cascade)
-  verifications MatriculationVerification[]
-  documents     MatriculationDocument[]
-  undertaking   Undertaking?
-}
-
-model MatriculationDocument {
-  id              String  @id @default(cuid())
-  matriculationId String
-  documentNo      Int
-  documentName    String
-  isApplicable    Boolean @default(false)
-  isSubmitted     Boolean @default(false)
-  isVerified      Boolean @default(false)
-  fileName        String?
-  filePath        String?
-  fileSize        Int?
-  mimeType        String?
-  uploadedBy      String?
-  uploadedAt      DateTime?
-  verifiedBy      String?
-  verifiedAt      DateTime?
-  remarks         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  matriculation Matriculation @relation(fields: [matriculationId], references: [id], onDelete: Cascade)
-
-  @@unique([matriculationId, documentNo])
-}
 
 model Undertaking {
   id              String    @id @default(cuid())
-  matriculationId String    @unique
+  scholarId       String    @unique
   fileName        String
   filePath        String
   uploadedBy      String?
@@ -201,12 +168,12 @@ model Undertaking {
   status          String    @default("PENDING")
   remarks         String?
   
-  matriculation Matriculation @relation(fields: [matriculationId], references: [id], onDelete: Cascade)
+  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
 }
 
-model MatriculationVerification {
+model ScholarVerification {
   id              String    @id @default(cuid())
-  matriculationId String
+  scholarId       String
   stage           String // HOD, DEAN, RDC
   status          String // VERIFIED, REJECTED, NOT_REQUIRED
   verifiedById    String?
@@ -214,8 +181,8 @@ model MatriculationVerification {
   remarks         String?
   createdAt       DateTime  @default(now())
 
-  matriculation Matriculation @relation(fields: [matriculationId], references: [id], onDelete: Cascade)
-  verifiedBy    User?         @relation(fields: [verifiedById], references: [id])
+  scholar    Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+  verifiedBy User?   @relation(fields: [verifiedById], references: [id])
 }
 
 model SupervisorAssignment {
@@ -255,6 +222,12 @@ model ScholarDocument {
   courseId           String?
   documentType       String
   documentName       String
+  documentNo         Int?      // Optional: For 1-18 matriculation checklist
+  fileName           String?
+  fileSize           Int?
+  mimeType           String?
+  isSubmitted        Boolean   @default(false)
+  isApplicable       Boolean   @default(true)
   filePath           String
   uploadedById       String?
   uploadedAt         DateTime  @default(now())

@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUserFromHeader } from "@/lib/jwt";
+import { PrismaClient } from '@prisma/client';
+import { verifyToken } from "@/lib/jwt";
+
+const prisma = new PrismaClient();
+
+async function checkAuth(req: NextRequest) {
+  const token = req.cookies.get('auth-token')?.value;
+  if (!token) return null;
+  return await verifyToken(token);
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getUserFromHeader(req);
+    const payload = await checkAuth(req);
+    if (!payload || !payload.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id as string },
+      include: { role: true }
+    });
+
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { stage, status, remarks } = await req.json();
@@ -21,7 +36,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const scholar = await prisma.scholar.findUnique({
       where: { id: scholarId },
-      include: { matriculation: true }
     });
 
     if (!scholar) return NextResponse.json({ error: "Scholar not found" }, { status: 404 });
@@ -34,22 +48,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Cannot verify scholar from another school" }, { status: 403 });
     }
 
-    let matriculationId = scholar.matriculation?.id;
-    if (!matriculationId) {
-       const newMatriculation = await prisma.matriculation.create({
-         data: { scholarId, status: "DRAFT" }
-       });
-       matriculationId = newMatriculation.id;
-    }
-
     // Find existing
-    const existing = await prisma.matriculationVerification.findFirst({
-      where: { matriculationId, stage }
+    const existing = await prisma.scholarVerification.findFirst({
+      where: { scholarId, stage }
     });
 
     let verification;
     if (existing) {
-      verification = await prisma.matriculationVerification.update({
+      verification = await prisma.scholarVerification.update({
         where: { id: existing.id },
         data: {
           status,
@@ -59,9 +65,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       });
     } else {
-      verification = await prisma.matriculationVerification.create({
+      verification = await prisma.scholarVerification.create({
         data: {
-          matriculationId,
+          scholarId,
           stage,
           status,
           remarks,

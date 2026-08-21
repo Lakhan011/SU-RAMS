@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import { Printer, Save, CheckCircle, Upload, Eye, Download, RefreshCw, AlertCircle, FileText, X, GraduationCap, Calendar, Phone, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 
+
+const shortenFileName = (name: string) => {
+  if (!name) return "";
+  if (name.length <= 25) return name;
+  const extIndex = name.lastIndexOf('.');
+  const ext = extIndex > -1 ? name.substring(extIndex) : '';
+  const base = extIndex > -1 ? name.substring(0, extIndex) : name;
+  return base.substring(0, 15) + '...' + base.substring(base.length - 4) + ext;
+};
+
 export default function MatriculationView({ scholarId }: { scholarId: string }) {
   const router = useRouter();
   const idRef = useRef<string | null>(null);
@@ -86,9 +96,17 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
 
       const matriculationData = await safeJson(matriculationRes);
       if (matriculationData?.matriculation) {
+        let mergedDocuments = matriculationData.defaultDocuments || [];
+        if (matriculationData.matriculation.documents && matriculationData.matriculation.documents.length > 0) {
+          mergedDocuments = mergedDocuments.map((defDoc: any) => {
+            const uploaded = matriculationData.matriculation.documents.find((d: any) => d.documentNo === defDoc.documentNo);
+            return uploaded || defDoc;
+          });
+        }
+        
         setMatriculation({
           ...matriculationData.matriculation,
-          documents: matriculationData.matriculation.documents || matriculationData.defaultDocuments,
+          documents: mergedDocuments,
           date: matriculationData.matriculation.date ? new Date(matriculationData.matriculation.date).toISOString().split("T")[0] : "",
         });
       } else if (matriculationData?.defaultDocuments) {
@@ -111,6 +129,34 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleModeChange = async (newMode: string) => {
+    if (!idRef.current) return;
+    setMatriculation({ ...matriculation, mode: newMode });
+    
+    const loadToast = toast.loading("Saving mode...");
+    try {
+      const payload = {
+        ...matriculation,
+        mode: newMode,
+        verificationStatus: matriculation.verificationStatus,
+      };
+
+      const res = await fetch(`/api/scholars/${idRef.current}/matriculation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success("Mode updated successfully!", { id: loadToast });
+      } else {
+        toast.error("Failed to update mode", { id: loadToast });
+      }
+    } catch (error) {
+      toast.error("Error updating mode", { id: loadToast });
+    }
   };
 
   const handleSave = async (isSubmit = false) => {
@@ -333,11 +379,11 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                 <span className="font-bold w-40 shrink-0">Mode:</span>
                 <div className="flex gap-6 flex-1">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={matriculation.mode === "FULL_TIME"} onChange={(e) => setMatriculation({...matriculation, mode: "FULL_TIME"})} disabled={!isCoordinator} className="accent-black w-4 h-4" /> 
+                    <input type="radio" checked={matriculation.mode === "FULL_TIME"} onChange={(e) => setMatriculation({...matriculation, mode: "FULL_TIME"})}  className="accent-black w-4 h-4" /> 
                     Full Time
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={matriculation.mode === "PART_TIME"} onChange={(e) => setMatriculation({...matriculation, mode: "PART_TIME"})} disabled={!isCoordinator} className="accent-black w-4 h-4" /> 
+                    <input type="radio" checked={matriculation.mode === "PART_TIME"} onChange={(e) => setMatriculation({...matriculation, mode: "PART_TIME"})}  className="accent-black w-4 h-4" /> 
                     Part Time
                   </label>
                 </div>
@@ -406,14 +452,14 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                         ) : !doc.filePath ? (
                           <button 
                             onClick={() => triggerUpload(doc.documentNo)}
-                            disabled={!isCoordinator}
+                            
                             className="text-xs inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 font-medium transition-colors disabled:opacity-50"
                           >
                             <Upload className="w-3.5 h-3.5" /> Upload
                           </button>
                         ) : (
                           <div className="flex flex-col gap-1 items-center">
-                            <span className="text-[10px] text-gray-500 truncate w-full px-1" title={doc.fileName}>{doc.fileName}</span>
+                            <span className="text-[11px] text-slate-600 font-medium px-1 max-w-[140px] truncate block" title={doc.fileName}>{shortenFileName(doc.fileName)}</span>
                             <div className="flex items-center gap-1">
                               <a href={doc.filePath} target="_blank" rel="noreferrer" className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="View">
                                 <Eye className="w-3.5 h-3.5" />
@@ -422,8 +468,8 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                                 <Download className="w-3.5 h-3.5" />
                               </a>
                               {isCoordinator && (
-                                <button onClick={() => triggerUpload(doc.documentNo)} className="p-1 text-orange-600 hover:bg-orange-50 rounded" title="Replace">
-                                  <RefreshCw className="w-3.5 h-3.5" />
+                                <button onClick={() => triggerUpload(doc.documentNo)} className="flex items-center gap-1 p-1 px-2 text-[10px] font-bold text-orange-600 hover:bg-orange-50 rounded transition-colors" title="Re-upload Document">
+                                  <Upload className="w-3.5 h-3.5" /> Re-upload
                                 </button>
                               )}
                             </div>
@@ -452,12 +498,12 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                     <div className="flex flex-col gap-2 items-center bg-white p-3 border border-gray-200 rounded shadow-sm">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-blue-500" />
-                        <span className="text-xs font-medium truncate max-w-[150px]">{matriculation.undertaking.fileName}</span>
+                        <span className="text-xs font-medium truncate max-w-[150px]" title={matriculation.undertaking.fileName}>{shortenFileName(matriculation.undertaking.fileName)}</span>
                       </div>
                       <div className="flex gap-2 w-full">
                         <a href={matriculation.undertaking.filePath} target="_blank" rel="noreferrer" className="flex-1 text-center text-xs py-1 px-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 font-medium">View</a>
                         {isCoordinator && (
-                          <button onClick={triggerUndertakingUpload} className="flex-1 text-xs py-1 px-2 bg-orange-50 text-orange-600 rounded hover:bg-orange-100 font-medium">Replace</button>
+                          <button onClick={triggerUndertakingUpload} className="flex-1 text-xs py-1 px-2 bg-orange-50 text-orange-600 rounded hover:bg-orange-100 font-medium flex items-center justify-center gap-1"><Upload className="w-3 h-3" /> Re-upload</button>
                         )}
                       </div>
                     </div>
