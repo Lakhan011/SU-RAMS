@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // SUPER_ADMIN, VC, RDC_ADMIN, SUPERVISOR, DEAN, HOD, COORDINATOR, SCHOLAR
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  roleId       String
+  schoolId     String?
+  departmentId String?
+  status       String   @default("ACTIVE") // ACTIVE, DISABLED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role       Role        @relation(fields: [roleId], references: [id])
+  school     School?     @relation(fields: [schoolId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  assignedScholars SupervisorAssignment[]
+  auditLogs        AuditLog[]
+
+  verifiedMatriculations MatriculationVerification[]
+}
+
+model School {
+  id          String   @id @default(cuid())
+  schoolCode  String   @unique
+  schoolName  String
+  description String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  departments Department[]
+  users       User[]
+  scholars    Scholar[]
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  departmentCode String   @unique
+  departmentName String
+  schoolId       String
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  courses  Course[]
+  users    User[]
+  scholars Scholar[]
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  courseCode   String   @unique
+  courseName   String
+  description  String?
+  credits      Int?
+  departmentId String
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department     Department      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  scholarCourses ScholarCourse[]
+  exams          Exam[]
+}
+
+model Scholar {
+  id                 String    @id @default(cuid())
+  scholarId          String    @unique
+  enrollmentNumber   String    @unique
+  registrationNumber String?
+  firstName          String
+  lastName           String
+  email              String    @unique
+  phone              String?
+  country            String?
+  dateOfBirth        DateTime?
+  gender             String?
+  address            String?
+  schoolId           String
+  departmentId       String
+  program            String?
+  admissionDate      DateTime?
+  status             String    @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  school     School     @relation(fields: [schoolId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+
+  matriculation Matriculation?
+  supervisor    SupervisorAssignment?
+  courses       ScholarCourse[]
+  documents     ScholarDocument[]
+  exams         Exam[]
+  results       Result[]
+
+  @@index([createdAt])
+}
+
+model Matriculation {
+  id                 String    @id @default(cuid())
+  scholarId          String    @unique
+  mode               String?   // FULL_TIME | PART_TIME
+  date               DateTime?
+  preparedBy         String?
+  designation        String?
+  verificationStatus String?   // COMPLETE | INCOMPLETE | UNDERTAKING
+  originalDocsProduced Boolean @default(false)
+  status             String    @default("DRAFT")
+  submittedBy        String?
+  submittedAt        DateTime?
+  approvedBy         String?
+  approvedAt         DateTime?
+  remarks            String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  scholar       Scholar                     @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+  verifications MatriculationVerification[]
+  documents     MatriculationDocument[]
+  undertaking   Undertaking?
+}
+
+model MatriculationDocument {
+  id              String  @id @default(cuid())
+  matriculationId String
+  documentNo      Int
+  documentName    String
+  isApplicable    Boolean @default(false)
+  isSubmitted     Boolean @default(false)
+  isVerified      Boolean @default(false)
+  fileName        String?
+  filePath        String?
+  fileSize        Int?
+  mimeType        String?
+  uploadedBy      String?
+  uploadedAt      DateTime?
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  remarks         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  matriculation Matriculation @relation(fields: [matriculationId], references: [id], onDelete: Cascade)
+
+  @@unique([matriculationId, documentNo])
+}
+
+model Undertaking {
+  id              String    @id @default(cuid())
+  matriculationId String    @unique
+  fileName        String
+  filePath        String
+  uploadedBy      String?
+  uploadedAt      DateTime  @default(now())
+  status          String    @default("PENDING")
+  remarks         String?
+  
+  matriculation Matriculation @relation(fields: [matriculationId], references: [id], onDelete: Cascade)
+}
+
+model MatriculationVerification {
+  id              String    @id @default(cuid())
+  matriculationId String
+  stage           String // HOD, DEAN, RDC
+  status          String // VERIFIED, REJECTED, NOT_REQUIRED
+  verifiedById    String?
+  verifiedAt      DateTime?
+  remarks         String?
+  createdAt       DateTime  @default(now())
+
+  matriculation Matriculation @relation(fields: [matriculationId], references: [id], onDelete: Cascade)
+  verifiedBy    User?         @relation(fields: [verifiedById], references: [id])
+}
+
+model SupervisorAssignment {
+  id           String    @id @default(cuid())
+  scholarId    String    @unique
+  supervisorId String
+  assignedById String?
+  assignedAt   DateTime?
+  status       String    @default("ASSIGNED")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  scholar    Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+  supervisor User    @relation(fields: [supervisorId], references: [id])
+}
+
+model ScholarCourse {
+  id            String    @id @default(cuid())
+  scholarId     String
+  courseId      String
+  allocatedById String?
+  allocatedAt   DateTime?
+  status        String    @default("PENDING_VERIFICATION")
+  verifiedById  String?
+  verifiedAt    DateTime?
+  remarks       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model ScholarDocument {
+  id                 String    @id @default(cuid())
+  scholarId          String
+  courseId           String?
+  documentType       String
+  documentName       String
+  filePath           String
+  uploadedById       String?
+  uploadedAt         DateTime  @default(now())
+  verificationStatus String    @default("PENDING_VERIFICATION")
+  verifiedById       String?
+  verifiedAt         DateTime?
+  remarks            String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+}
+
+model Exam {
+  id          String   @id @default(cuid())
+  scholarId   String
+  courseId    String
+  examDate    DateTime
+  startTime   String
+  endTime     String
+  examType    String // REGULAR, RE_EXAM
+  status      String   @default("SCHEDULED")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scholar Scholar  @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  results Result[]
+}
+
+model Result {
+  id            String   @id @default(cuid())
+  scholarId     String
+  courseId      String
+  examId        String
+  marksObtained Float
+  maximumMarks  Float
+  result        String // PASS, FAIL, RE_EXAM_REQUIRED
+  remarks       String?
+  enteredById   String?
+  enteredAt     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmailLog {
+  id           String    @id @default(cuid())
+  recipient    String
+  subject      String
+  type         String
+  status       String // SENT, FAILED
+  sentAt       DateTime?
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  String?  @db.Text
+  newValue  String?  @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
