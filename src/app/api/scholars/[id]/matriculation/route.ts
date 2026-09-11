@@ -142,7 +142,7 @@ export async function POST(
             where: { id: existingDoc.id },
             data: {
               documentName: doc.documentName,
-              isApplicable: doc.isApplicable ?? false,
+              isApplicable: doc.isApplicable ?? true,
               isSubmitted: doc.isSubmitted ?? false,
               fileName: doc.fileName || null,
               filePath: doc.filePath || "",
@@ -157,7 +157,7 @@ export async function POST(
               documentType: "MATRICULATION",
               documentNo: doc.documentNo,
               documentName: doc.documentName,
-              isApplicable: doc.isApplicable ?? false,
+              isApplicable: doc.isApplicable ?? true,
               isSubmitted: doc.isSubmitted ?? false,
               fileName: doc.fileName || null,
               filePath: doc.filePath || "",
@@ -169,7 +169,26 @@ export async function POST(
       }
     }
 
+    
+    if (undertaking && undertaking.filePath) {
+      await prisma.undertaking.upsert({
+        where: { scholarId },
+        create: {
+          scholarId,
+          fileName: undertaking.fileName || "",
+          filePath: undertaking.filePath,
+          remarks: undertaking.remarks || "",
+        },
+        update: {
+          fileName: undertaking.fileName || "",
+          filePath: undertaking.filePath,
+          remarks: undertaking.remarks || "",
+        }
+      });
+    }
+
     // Refresh mapped object
+
     const finalScholar = await prisma.scholar.findUnique({
       where: { id: scholarId },
       include: { 

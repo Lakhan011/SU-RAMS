@@ -143,6 +143,7 @@ export default function SchoolsPage() {
               <tr className="bg-background border-b border-border">
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">School Code</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">School Name</th>
+                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Departments</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Scholars</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider text-center">Status</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider text-right">Actions</th>
@@ -151,11 +152,11 @@ export default function SchoolsPage() {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted">Loading schools...</td>
+                  <td colSpan={6} className="py-8 text-center text-muted">Loading schools...</td>
                 </tr>
               ) : schools.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted">No schools found</td>
+                  <td colSpan={6} className="py-8 text-center text-muted">No schools found</td>
                 </tr>
               ) : (
                 schools.map((school) => (
@@ -167,6 +168,9 @@ export default function SchoolsPage() {
                     </td>
                     <td className="py-4 px-6">
                       <p className="text-sm font-medium text-foreground">{school.schoolName}</p>
+                    </td>
+                    <td className="py-4 px-6 text-sm font-medium text-foreground">
+                      {school._count?.departments || 0}
                     </td>
                     <td className="py-4 px-6 text-sm font-medium text-foreground">
                       {school._count?.scholars || 0}

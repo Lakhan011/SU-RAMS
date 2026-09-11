@@ -25,6 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params;
+    console.log("PUT RECEIVED DATA: ", await req.clone().json());
     const data = await req.json();
     const { 
       scholarId, enrollmentNumber, firstName, lastName, email, phone, country,
@@ -32,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       supervisorId
     } = data;
 
+    
     const updatedScholar = await prisma.scholar.update({
       where: { id },
       data: {
@@ -52,7 +54,33 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     });
 
+    if (supervisorId !== undefined) {
+      if (supervisorId === "") {
+        await prisma.supervisorAssignment.deleteMany({ where: { scholarId: id } });
+      } else {
+        await prisma.supervisorAssignment.upsert({
+          where: { scholarId: id },
+          create: { scholarId: id, supervisorId, assignedById: auth.id },
+          update: { supervisorId, assignedById: auth.id }
+        });
+      }
+    }
+
+    if (data.courseIds !== undefined) {
+      await prisma.scholarCourse.deleteMany({ where: { scholarId: id } });
+      if (Array.isArray(data.courseIds) && data.courseIds.length > 0) {
+        await prisma.scholarCourse.createMany({
+          data: data.courseIds.map(courseId => ({
+            scholarId: id,
+            courseId,
+            allocatedById: auth.id
+          }))
+        });
+      }
+    }
+
     return NextResponse.json({ message: 'Scholar updated', scholar: updatedScholar });
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

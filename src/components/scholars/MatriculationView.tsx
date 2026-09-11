@@ -159,6 +159,35 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
     }
   };
 
+
+  const handleOriginalDocsChange = async (checked: boolean) => {
+    if (!idRef.current) return;
+    setMatriculation({ ...matriculation, originalDocsProduced: checked });
+    
+    const loadToast = toast.loading("Saving checkbox status...");
+    try {
+      const payload = {
+        ...matriculation,
+        originalDocsProduced: checked,
+        verificationStatus: matriculation.verificationStatus,
+      };
+
+      const res = await fetch(`/api/scholars/${idRef.current}/matriculation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success("Checkbox updated successfully!", { id: loadToast });
+      } else {
+        toast.error("Failed to update checkbox", { id: loadToast });
+      }
+    } catch (error) {
+      toast.error("Error updating checkbox", { id: loadToast });
+    }
+  };
+
   const handleSave = async (isSubmit = false) => {
     if (!idRef.current) return;
     if (isSubmit) setSubmitting(true);
@@ -235,32 +264,44 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
       if (res.ok) {
         toast.success("File uploaded successfully", { id: loadToast });
         
+
+        let updatedMatriculation;
         if (isUndertaking) {
-          setMatriculation((prev: any) => ({
-            ...prev,
+          updatedMatriculation = {
+            ...matriculation,
             undertaking: {
               fileName: data.fileName,
               filePath: data.filePath,
               remarks: "",
             }
-          }));
+          };
+          setMatriculation(updatedMatriculation);
         } else if (uploadingDocNo !== null) {
-          setMatriculation((prev: any) => {
-            const newDocs = [...prev.documents];
-            const idx = newDocs.findIndex(d => d.documentNo === uploadingDocNo);
-            if (idx >= 0) {
-              newDocs[idx] = {
-                ...newDocs[idx],
-                fileName: data.fileName,
-                filePath: data.filePath,
-                fileSize: data.fileSize,
-                mimeType: data.mimeType,
-                isSubmitted: true,
-              };
-            }
-            return { ...prev, documents: newDocs };
-          });
+          const newDocs = [...matriculation.documents];
+          const idx = newDocs.findIndex(d => d.documentNo === uploadingDocNo);
+          if (idx >= 0) {
+            newDocs[idx] = {
+              ...newDocs[idx],
+              fileName: data.fileName,
+              filePath: data.filePath,
+              fileSize: data.fileSize,
+              mimeType: data.mimeType,
+              isSubmitted: true,
+            };
+          }
+          updatedMatriculation = { ...matriculation, documents: newDocs };
+          setMatriculation(updatedMatriculation);
         }
+
+        // Auto-save to database
+        if (updatedMatriculation && idRef.current) {
+          fetch(`/api/scholars/${idRef.current}/matriculation`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedMatriculation),
+          }).catch(console.error);
+        }
+
       } else {
         toast.error(data.error || "Upload failed", { id: loadToast });
       }
@@ -379,11 +420,11 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                 <span className="font-bold w-40 shrink-0">Mode:</span>
                 <div className="flex gap-6 flex-1">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={matriculation.mode === "FULL_TIME"} onChange={(e) => setMatriculation({...matriculation, mode: "FULL_TIME"})}  className="accent-black w-4 h-4" /> 
+                    <input type="radio" checked={matriculation.mode === "FULL_TIME"} onChange={(e) => handleModeChange("FULL_TIME")}  className="accent-black w-4 h-4" /> 
                     Full Time
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={matriculation.mode === "PART_TIME"} onChange={(e) => setMatriculation({...matriculation, mode: "PART_TIME"})}  className="accent-black w-4 h-4" /> 
+                    <input type="radio" checked={matriculation.mode === "PART_TIME"} onChange={(e) => handleModeChange("PART_TIME")}  className="accent-black w-4 h-4" /> 
                     Part Time
                   </label>
                 </div>
@@ -564,7 +605,7 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
               <input 
                 type="checkbox" 
                 checked={!!matriculation.originalDocsProduced} 
-                onChange={(e) => setMatriculation({...matriculation, originalDocsProduced: e.target.checked})} 
+                onChange={(e) => handleOriginalDocsChange(e.target.checked)} 
                 disabled={!canVerify}
                 className="w-5 h-5 accent-black cursor-pointer" 
               />

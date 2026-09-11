@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     where: whereClause,
     include: {
       school: true,
-      department: true
+      department: true, verifications: true, supervisor: true, courses: true
     },
     orderBy: { createdAt: 'desc' }
   });

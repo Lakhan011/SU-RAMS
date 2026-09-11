@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const schools = await prisma.school.findMany({
     include: {
       _count: {
-        select: { scholars: true }
+        select: { scholars: true, departments: true }
       }
     },
     orderBy: { createdAt: 'desc' }

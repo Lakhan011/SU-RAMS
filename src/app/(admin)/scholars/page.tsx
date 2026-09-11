@@ -20,6 +20,7 @@ export default function ScholarsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [supervisors, setSupervisors] = useState<any[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
 
   const initialForm = {
     id: '',
@@ -37,30 +38,30 @@ export default function ScholarsPage() {
     departmentId: '',
     program: '',
     status: 'ACTIVE',
-    supervisorId: ''
+    supervisorId: '',
+    courseIds: [] as string[]
   };
   const [formData, setFormData] = useState(initialForm);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   
-  const fetchSupervisors = async (deptId: string) => {
+  const fetchSupervisors = async () => {
     try {
-      const res = await fetch(`/api/supervisors?departmentId=${deptId}`);
+      const res = await fetch(`/api/supervisors`);
       const data = await res.json();
       if (data.supervisors) setSupervisors(data.supervisors);
     } catch(e) {}
   };
 
   useEffect(() => {
-    if (formData.departmentId) fetchSupervisors(formData.departmentId);
-    else setSupervisors([]);
-  }, [formData.departmentId]);
+    fetchSupervisors();
+  }, []);
   
   const fetchData = async () => {
     try {
       const [scholarsRes, schoolsRes, deptsRes, authRes] = await Promise.all([
-        fetch('/api/scholars'),
+        fetch('/api/scholars?t=' + Date.now(), { cache: 'no-store' }),
         fetch('/api/schools'),
         fetch('/api/departments'),
         fetch('/api/auth/me')
@@ -114,7 +115,8 @@ export default function ScholarsPage() {
       departmentId: scholar.departmentId,
       program: scholar.program || '',
       status: scholar.status,
-      supervisorId: scholar.supervisor?.supervisorId || ''
+      supervisorId: scholar.supervisor?.supervisorId ? String(scholar.supervisor.supervisorId) : '',
+      courseIds: scholar.courses?.map((c: any) => String(c.courseId)) || []
     });
     setIsEditModalOpen(true); setActiveTab('profile');
   };
@@ -206,6 +208,7 @@ export default function ScholarsPage() {
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Name</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Program / Dept</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Joined Date</th>
+                <th className="py-4 px-6 text-center text-xs font-semibold text-muted uppercase tracking-wider">Verification</th>
                 <th className="py-4 px-6 text-center text-xs font-semibold text-muted uppercase tracking-wider">Status</th>
                 <th className="py-4 px-6 text-right text-xs font-semibold text-muted uppercase tracking-wider">Actions</th>
               </tr>
@@ -213,11 +216,11 @@ export default function ScholarsPage() {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">Loading scholars...</td>
+                  <td colSpan={7} className="py-8 text-center text-muted">Loading scholars...</td>
                 </tr>
               ) : scholars.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">No scholars found</td>
+                  <td colSpan={7} className="py-8 text-center text-muted">No scholars found</td>
                 </tr>
               ) : (
                 scholars.map((scholar) => (
@@ -238,7 +241,17 @@ export default function ScholarsPage() {
                     <td className="py-4 px-6 text-sm font-medium text-foreground">
                       {new Date(scholar.createdAt).toLocaleDateString()}
                     </td>
+                    
                     <td className="py-4 px-6 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        scholar.verificationStatus === 'COMPLETE' ? 'bg-success-light text-success' : 
+                        scholar.verificationStatus === 'PENDING' ? 'bg-warning-light text-warning' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {scholar.verificationStatus || 'DRAFT'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-center">
+
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                         scholar.status === 'ACTIVE' ? 'bg-success-light text-success' : 
                         scholar.status === 'GRADUATED' ? 'bg-primary-light text-primary' : 'bg-warning-light text-warning'
@@ -484,13 +497,102 @@ export default function ScholarsPage() {
                       const isVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'HOD') && currentScholar?.verifications?.find((v: any) => v.stage === 'DEAN');
                       const isCoordinator = currentUser?.rawRole === 'COORDINATOR' || currentUser?.rawRole === 'SUPER_ADMIN';
                       
-                      if (!isCoordinator) return null;
+                      if (!isCoordinator) {
+                        const isHodOrDean = currentUser?.rawRole === 'HOD' || currentUser?.rawRole === 'DEAN';
+                        if (!isHodOrDean) return null;
+
+                        const currentCourseId = formData.courseIds?.[0];
+                        const currentCourse = courses.find(c => c.id === currentCourseId);
+                        const currentSupervisor = supervisors.find(s => s.id === formData.supervisorId);
+                        
+                        const handleVerifyAssignment = async (stage: string) => {
+                          try {
+                            const res = await fetch(`/api/scholars/${formData.id}/assignments/verify`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ stage })
+                            });
+                            if (res.ok) {
+                              toast.success(`Assignments verified by ${stage}!`);
+                              fetchData();
+                            } else {
+                              toast.error(`Verification failed`);
+                            }
+                          } catch(e) {}
+                        };
+
+                        const currentStatus = currentScholar?.supervisor?.status;
+                        const canVerifyHod = currentUser?.rawRole === 'HOD' && currentStatus !== 'VERIFIED_HOD' && currentStatus !== 'VERIFIED_DEAN';
+                        const canVerifyDean = currentUser?.rawRole === 'DEAN' && currentStatus !== 'VERIFIED_DEAN';
+
+                        return (
+                          <div className="md:col-span-2 mt-4 space-y-4">
+                            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h4 className="text-sm font-bold text-slate-800">Course & Supervisor Assignment</h4>
+                                  <p className="text-xs text-slate-500 mt-1">Review the assignments made by the Coordinator. Status: <span className="font-semibold text-blue-600">{currentStatus || 'UNASSIGNED'}</span></p>
+                                </div>
+                                {(canVerifyHod || canVerifyDean) && formData.supervisorId && formData.courseIds?.length > 0 && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleVerifyAssignment(currentUser?.rawRole)}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                                  >
+                                    Verify as {currentUser?.rawRole}
+                                  </button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-500 mb-1">Assigned Course</label>
+                                  <div className="text-sm font-medium text-slate-800">
+                                    {currentCourse ? `${currentCourse.courseCode} - ${currentCourse.courseName}` : 'No course assigned yet'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-500 mb-1">Assigned Supervisor</label>
+                                  <div className="text-sm font-medium text-slate-800">
+                                    {currentSupervisor ? `${currentSupervisor.name} (${currentSupervisor.email})` : 'No supervisor assigned yet'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
                       
                       return (
-                        <div className="md:col-span-2 mt-4 p-4 rounded-xl border border-blue-100 bg-blue-50/50">
+                        <div className="md:col-span-2 mt-4 space-y-4">
+                        <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
+                          <h4 className="text-sm font-bold text-slate-800 mb-3">Course Assignment</h4>
+                          <div className="relative">
+                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Assign Course</label>
+                            <select 
+                              value={formData.courseIds?.[0] || ''} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormData({ ...formData, courseIds: val ? [val] : [] });
+                              }}
+                              disabled={!isVerified}
+                              className={`w-full px-4 py-2 rounded-lg border ${!isVerified ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-blue-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20'} text-sm`}
+                            >
+                              <option value="">-- Select Course --</option>
+                              {courses.map(c => <option key={c.id} value={c.id}>{c.courseCode} - {c.courseName}</option>)}
+                            </select>
+                            {!isVerified && (
+                              <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
+                                Assignment locked: Requires both HOD and Dean verification first.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
                           <h4 className="text-sm font-bold text-slate-800 mb-3">Supervisor Assignment</h4>
                           <div className="relative">
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Assign Supervisor (from same Department)</label>
+                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Assign Supervisor</label>
                             <select 
                               value={formData.supervisorId || ''} 
                               onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })} 
@@ -507,6 +609,7 @@ export default function ScholarsPage() {
                               </p>
                             )}
                           </div>
+                        </div>
                         </div>
                       );
                     })()}
