@@ -31,25 +31,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { stage } = await req.json();
 
-    if (stage !== "HOD" && stage !== "DEAN") {
+    if (stage !== "RDC") {
       return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
     }
 
-    if (user.role.name !== stage && user.role.name !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: `Forbidden: Must be ${stage} to verify` }, { status: 403 });
+    const isRdcMember = ["RDC_ADMIN", "VC", "SUPER_ADMIN", "ADMIN"].includes(user.role.name);
+    
+    if (!isRdcMember) {
+      return NextResponse.json({ error: `Forbidden: Must be an RDC member to verify` }, { status: 403 });
     }
 
     const { id: scholarId } = await params;
-    const targetStatus = stage === "HOD" ? "VERIFIED_HOD" : "VERIFIED_DEAN";
+    
+    const targetStatus = "VERIFIED_RDC";
 
     await prisma.supervisorAssignment.updateMany({
       where: { scholarId },
-      data: { status: targetStatus }
+      data: { status: targetStatus as string }
     });
 
     await prisma.scholarCourse.updateMany({
       where: { scholarId },
-      data: { status: targetStatus, verifiedById: user.id, verifiedAt: new Date() }
+      data: { status: targetStatus as string, verifiedById: user.id, verifiedAt: new Date() }
     });
 
     return NextResponse.json({ message: "Assignments verified successfully" });

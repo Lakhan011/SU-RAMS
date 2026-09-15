@@ -61,7 +61,7 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-border-light flex flex-col transition-all duration-300 ease-in-out",
+        "fixed left-0 top-0 z-50 h-screen bg-white border-r border-border-light flex flex-col transition-all duration-300 ease-in-out shadow-sm",
         collapsed ? "w-[72px]" : "w-[260px]"
       )}
     >
@@ -90,7 +90,7 @@ export default function Sidebar() {
                     "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all duration-200 group relative",
                     isGroupActive && !isExpanded
                       ? "bg-primary/10 text-primary"
-                      : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
+                      : "text-muted hover:text-foreground hover:bg-surface-hover"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -122,7 +122,7 @@ export default function Sidebar() {
                             "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
                             isActive
                               ? "bg-primary text-white shadow-md shadow-primary/25"
-                              : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
+                              : "text-muted hover:text-foreground hover:bg-surface-hover"
                           )}
                         >
                           <child.icon className={cn("w-[16px] h-[16px] shrink-0", isActive ? "text-white" : "text-sidebar-text")} />
@@ -145,7 +145,7 @@ export default function Sidebar() {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all duration-200 group relative",
                 isActive
                   ? "bg-primary text-white shadow-md shadow-primary/25"
-                  : "text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover"
+                  : "text-muted hover:text-foreground hover:bg-surface-hover"
               )}
             >
               <item.icon className={cn("w-[18px] h-[18px] shrink-0 transition-colors duration-200", isActive ? "text-white" : "text-sidebar-text group-hover:text-sidebar-text-active")} />
@@ -164,7 +164,7 @@ export default function Sidebar() {
       <div className="px-3 pb-4">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center justify-center w-full py-2.5 rounded-lg text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover transition-all duration-200"
+          className="flex items-center justify-center w-full py-2.5 rounded-lg text-muted hover:text-foreground hover:bg-surface-hover transition-all duration-200"
         >
           <ChevronLeft className={cn("w-[18px] h-[18px] transition-transform duration-300", collapsed && "rotate-180")} />
         </button>

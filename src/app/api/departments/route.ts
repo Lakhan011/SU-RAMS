@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { jwtVerify } from 'jose';
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     include: {
       school: true,
       _count: {
-        select: { scholars: true, courses: true }
+        select: { scholars: true, courses: true, users: { where: { role: { name: 'HOD' } } } }
       }
     },
     orderBy: { createdAt: 'desc' }

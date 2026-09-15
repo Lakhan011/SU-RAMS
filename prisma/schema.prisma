@@ -152,6 +152,7 @@ model Scholar {
   documents     ScholarDocument[]
   exams         Exam[]
   results       Result[]
+  presentations Presentation[]
 
   @@index([createdAt])
 }
@@ -269,12 +270,39 @@ model Result {
   result        String // PASS, FAIL, RE_EXAM_REQUIRED
   remarks       String?
   enteredById   String?
-  enteredAt     DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  enteredAt          DateTime @default(now())
+  verificationStatus String   @default("PENDING") // PENDING, VERIFIED_RDC
+  verifiedById       String?
+  verifiedAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
   exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+model Presentation {
+  id                 String    @id @default(cuid())
+  scholarId          String
+  type               String    @default("DRC") // DRC, SRC
+  synopsisUrl        String?
+  momUrl             String?
+  documentsUrl       String?
+  externalExperts    String?   @db.Text
+  researchNominees   String?   @db.Text
+  nomineesStatus     String    @default("APPROVED_BY_VC") // PENDING, APPROVED_BY_VC
+  vcExperts          String?   @db.Text
+  presentationDate   String?
+  presentationTime   String?
+  result             String?
+  remarks            String?
+  verificationStatus String    @default("PENDING") // PENDING, VERIFIED_RDC
+  verifiedById       String?
+  verifiedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  scholar Scholar @relation(fields: [scholarId], references: [id], onDelete: Cascade)
 }
 
 model Notification {

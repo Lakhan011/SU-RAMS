@@ -1,10 +1,12 @@
 'use client';
 
-import { Plus, Search, Edit, Trash2, X, GraduationCap, Phone, Mail, Calendar, User, BookOpen, FileCheck } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, X, Check, XCircle, FileText, User, UserCog, Mail, Phone, GraduationCap, Building2, MapPin, AlignLeft, Calendar, FileCheck, ExternalLink, Download, Loader2, BookOpen, MonitorPlay } from 'lucide-react';
+import toast from 'react-hot-toast';
 import MatriculationView from '@/components/scholars/MatriculationView';
+import ExamsView from '@/components/scholars/ExamsView';
+import PresentationView from '@/components/scholars/PresentationView';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
 
 export default function ScholarsPage() {
   const router = useRouter();
@@ -15,7 +17,7 @@ export default function ScholarsPage() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'matriculation'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'matriculation' | 'exams' | 'drc-presentation' | 'src-presentation'>('profile');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,23 +62,26 @@ export default function ScholarsPage() {
   
   const fetchData = async () => {
     try {
-      const [scholarsRes, schoolsRes, deptsRes, authRes] = await Promise.all([
+      const [scholarsRes, schoolsRes, deptsRes, authRes, coursesRes] = await Promise.all([
         fetch('/api/scholars?t=' + Date.now(), { cache: 'no-store' }),
         fetch('/api/schools'),
         fetch('/api/departments'),
-        fetch('/api/auth/me')
+        fetch('/api/auth/me'),
+        fetch('/api/courses')
       ]);
       
-      if (scholarsRes.ok && schoolsRes.ok && deptsRes.ok && authRes.ok) {
+      if (scholarsRes.ok && schoolsRes.ok && deptsRes.ok && authRes.ok && coursesRes.ok) {
         const scholarsData = await scholarsRes.json();
         const schoolsData = await schoolsRes.json();
         const deptsData = await deptsRes.json();
         const authData = await authRes.json();
+        const coursesData = await coursesRes.json();
         
         setScholars(scholarsData.scholars || []);
         setSchools(schoolsData.schools || []);
         setDepartments(deptsData.departments || []);
         setCurrentUser(authData);
+        setCourses(coursesData.courses || []);
       }
     } catch (e) {
       toast.error('Failed to load data');
@@ -98,27 +103,42 @@ export default function ScholarsPage() {
     setIsModalOpen(true); setActiveTab('profile');
   };
 
-  const openEditModal = (scholar: any) => {
-    setFormData({
-      id: scholar.id,
-      scholarId: scholar.scholarId,
-      enrollmentNumber: scholar.enrollmentNumber,
-      firstName: scholar.firstName,
-      lastName: scholar.lastName,
-      email: scholar.email,
-      phone: scholar.phone || '',
-      country: scholar.country || '',
-      dateOfBirth: scholar.dateOfBirth ? new Date(scholar.dateOfBirth).toISOString().split('T')[0] : '',
-      gender: scholar.gender || '',
-      address: scholar.address || '',
-      schoolId: scholar.schoolId,
-      departmentId: scholar.departmentId,
-      program: scholar.program || '',
-      status: scholar.status,
-      supervisorId: scholar.supervisor?.supervisorId ? String(scholar.supervisor.supervisorId) : '',
-      courseIds: scholar.courses?.map((c: any) => String(c.courseId)) || []
-    });
-    setIsEditModalOpen(true); setActiveTab('profile');
+  const openEditModal = async (scholar: any) => {
+    try {
+      const toastId = toast.loading('Loading scholar details...');
+      const res = await fetch(`/api/scholars/${scholar.id}`);
+      const data = await res.json();
+      toast.dismiss(toastId);
+      
+      if (res.ok && data.scholar) {
+        const fullScholar = data.scholar;
+        setFormData({
+          id: fullScholar.id,
+          scholarId: fullScholar.scholarId,
+          enrollmentNumber: fullScholar.enrollmentNumber,
+          firstName: fullScholar.firstName,
+          lastName: fullScholar.lastName,
+          email: fullScholar.email,
+          phone: fullScholar.phone || '',
+          country: fullScholar.country || '',
+          dateOfBirth: fullScholar.dateOfBirth ? new Date(fullScholar.dateOfBirth).toISOString().split('T')[0] : '',
+          gender: fullScholar.gender || '',
+          address: fullScholar.address || '',
+          schoolId: fullScholar.schoolId,
+          departmentId: fullScholar.departmentId,
+          program: fullScholar.program || '',
+          status: fullScholar.status,
+          supervisorId: fullScholar.supervisor?.supervisorId ? String(fullScholar.supervisor.supervisorId) : '',
+          courseIds: fullScholar.courses?.map((c: any) => String(c.courseId)) || []
+        });
+        setIsEditModalOpen(true); 
+        setActiveTab('profile');
+      } else {
+        toast.error('Failed to load scholar details');
+      }
+    } catch (e) {
+      toast.error('Failed to load scholar details');
+    }
   };
   const confirmDelete = (id: string) => {
     setDeletingId(id);
@@ -142,6 +162,10 @@ export default function ScholarsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole)) {
+      toast.error('You do not have permission to edit scholar profiles.');
+      return;
+    }
     if (!formData.scholarId || !formData.enrollmentNumber || !formData.firstName || !formData.lastName || !formData.email || !formData.schoolId || !formData.departmentId) {
       toast.error('Please fill all required fields');
       return;
@@ -243,12 +267,25 @@ export default function ScholarsPage() {
                     </td>
                     
                     <td className="py-4 px-6 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        scholar.verificationStatus === 'COMPLETE' ? 'bg-success-light text-success' : 
-                        scholar.verificationStatus === 'PENDING' ? 'bg-warning-light text-warning' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {scholar.verificationStatus || 'DRAFT'}
-                      </span>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
+                          scholar.verificationStatus === 'COMPLETE' ? 'bg-success-light text-success border-success/20' : 
+                          scholar.verificationStatus === 'PENDING' ? 'bg-warning-light text-warning border-warning/20' : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`} title="Matriculation Verification">
+                          MATRIC: {scholar.verificationStatus || 'DRAFT'}
+                        </span>
+                        
+                        {scholar.supervisor && (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
+                            scholar.supervisor.status === 'VERIFIED_RDC' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                            scholar.supervisor.status === 'VERIFIED_BOTH' ? 'bg-purple-50 text-purple-600 border-purple-200' : 
+                            scholar.supervisor.status === 'VERIFIED_DEAN' ? 'bg-blue-50 text-blue-600 border-blue-200' : 
+                            scholar.supervisor.status === 'VERIFIED_HOD' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                          }`} title="Assignment Verification">
+                            ASSGN: {scholar.supervisor.status === 'VERIFIED_RDC' ? 'VERIFIED RDC' : scholar.supervisor.status === 'VERIFIED_BOTH' ? 'VERIFIED HOD & DEAN' : scholar.supervisor.status || 'UNASSIGNED'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-6 text-center">
 
@@ -298,10 +335,10 @@ export default function ScholarsPage() {
               </div>
               
               <div className="shrink-0 flex justify-center mx-4">
-                <div className="flex bg-slate-100 p-1 rounded-[10px] border border-slate-200/60 shadow-inner w-fit">
+                <div className="flex bg-slate-100 p-1 rounded-lg">
                   <button
                     type="button"
-                    className={`py-1.5 px-4 text-sm font-semibold rounded-md flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'profile' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'profile' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
                     onClick={() => setActiveTab('profile')}
                   >
                     <User className="w-4 h-4" />
@@ -312,10 +349,40 @@ export default function ScholarsPage() {
                     disabled={!formData.id}
                     className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'matriculation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
                     onClick={() => formData.id && setActiveTab('matriculation')}
-                    title={!formData.id ? "Please create the scholar first to unlock matriculation" : ""}
+                    title={!formData.id ? "Please create the scholar first to manage matriculation" : ""}
                   >
                     <FileCheck className="w-4 h-4" />
                     Matriculation Checklist
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!formData.id}
+                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'exams' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    onClick={() => formData.id && setActiveTab('exams')}
+                    title={!formData.id ? "Please create the scholar first to manage exams" : ""}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Exams
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!formData.id}
+                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'drc-presentation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    onClick={() => formData.id && setActiveTab('drc-presentation')}
+                    title={!formData.id ? "Please create the scholar first to manage presentations" : ""}
+                  >
+                    <MonitorPlay className="w-4 h-4" />
+                    DRC Presentation
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!formData.id}
+                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'src-presentation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    onClick={() => formData.id && setActiveTab('src-presentation')}
+                    title={!formData.id ? "Please create the scholar first to manage presentations" : ""}
+                  >
+                    <MonitorPlay className="w-4 h-4" />
+                    SRC Presentation
                   </button>
                 </div>
               </div>
@@ -494,13 +561,21 @@ export default function ScholarsPage() {
                     {/* Supervisor Assignment */}
                     {(() => {
                       const currentScholar = scholars.find((s: any) => s.id === formData.id);
-                      const isVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'HOD') && currentScholar?.verifications?.find((v: any) => v.stage === 'DEAN');
-                      const isCoordinator = currentUser?.rawRole === 'COORDINATOR' || currentUser?.rawRole === 'SUPER_ADMIN';
-                      
-                      if (!isCoordinator) {
-                        const isHodOrDean = currentUser?.rawRole === 'HOD' || currentUser?.rawRole === 'DEAN';
-                        if (!isHodOrDean) return null;
+                      const dept = departments.find(d => d.id === formData.departmentId);
+                      const hasHod = dept?._count?.users > 0;
 
+                      const hodVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'HOD');
+                      const deanVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'DEAN');
+                      const isVerified = deanVerified && (!hasHod || hodVerified);
+
+                      const isCoordinator = currentUser?.rawRole === 'COORDINATOR';
+                      const isRdcMember = ['SUPER_ADMIN', 'ADMIN', 'VC', 'RDC_ADMIN'].includes(currentUser?.rawRole);
+                      
+                      if (!isCoordinator && !isRdcMember) {
+                        return null;
+                      }
+
+                      if (!isCoordinator) {
                         const currentCourseId = formData.courseIds?.[0];
                         const currentCourse = courses.find(c => c.id === currentCourseId);
                         const currentSupervisor = supervisors.find(s => s.id === formData.supervisorId);
@@ -513,7 +588,7 @@ export default function ScholarsPage() {
                               body: JSON.stringify({ stage })
                             });
                             if (res.ok) {
-                              toast.success(`Assignments verified by ${stage}!`);
+                              toast.success(`Assignments verified!`);
                               fetchData();
                             } else {
                               toast.error(`Verification failed`);
@@ -522,8 +597,12 @@ export default function ScholarsPage() {
                         };
 
                         const currentStatus = currentScholar?.supervisor?.status;
-                        const canVerifyHod = currentUser?.rawRole === 'HOD' && currentStatus !== 'VERIFIED_HOD' && currentStatus !== 'VERIFIED_DEAN';
-                        const canVerifyDean = currentUser?.rawRole === 'DEAN' && currentStatus !== 'VERIFIED_DEAN';
+                        const canVerifyRdc = isRdcMember && currentStatus !== 'VERIFIED_RDC';
+
+                        const stageName = 'RDC';
+
+                        let displayStatus = currentStatus || 'UNASSIGNED';
+                        if (currentStatus === 'VERIFIED_RDC') displayStatus = 'VERIFIED RDC';
 
                         return (
                           <div className="md:col-span-2 mt-4 space-y-4">
@@ -531,15 +610,15 @@ export default function ScholarsPage() {
                               <div className="flex justify-between items-start mb-4">
                                 <div>
                                   <h4 className="text-sm font-bold text-slate-800">Course & Supervisor Assignment</h4>
-                                  <p className="text-xs text-slate-500 mt-1">Review the assignments made by the Coordinator. Status: <span className="font-semibold text-blue-600">{currentStatus || 'UNASSIGNED'}</span></p>
+                                  <p className="text-xs text-slate-500 mt-1">Review the assignments made by the Coordinator. Status: <span className="font-semibold text-blue-600">{displayStatus}</span></p>
                                 </div>
-                                {(canVerifyHod || canVerifyDean) && formData.supervisorId && formData.courseIds?.length > 0 && (
+                                {canVerifyRdc && (formData.supervisorId || (formData.courseIds && formData.courseIds.length > 0)) && (
                                   <button 
                                     type="button"
-                                    onClick={() => handleVerifyAssignment(currentUser?.rawRole)}
+                                    onClick={() => handleVerifyAssignment(stageName)}
                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
                                   >
-                                    Verify as {currentUser?.rawRole}
+                                    Verify as {stageName}
                                   </button>
                                 )}
                               </div>
@@ -578,12 +657,14 @@ export default function ScholarsPage() {
                               className={`w-full px-4 py-2 rounded-lg border ${!isVerified ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-blue-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20'} text-sm`}
                             >
                               <option value="">-- Select Course --</option>
-                              {courses.map(c => <option key={c.id} value={c.id}>{c.courseCode} - {c.courseName}</option>)}
+                              {courses
+                                .filter(c => c.departmentId === formData.departmentId)
+                                .map(c => <option key={c.id} value={c.id}>{c.courseCode} - {c.courseName}</option>)}
                             </select>
                             {!isVerified && (
                               <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
-                                Assignment locked: Requires both HOD and Dean verification first.
+                                Assignment locked: Requires {hasHod ? 'both HOD and Dean' : 'Dean'} verification first.
                               </p>
                             )}
                           </div>
@@ -605,7 +686,7 @@ export default function ScholarsPage() {
                             {!isVerified && (
                               <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
-                                Assignment locked: Requires both HOD and Dean verification first.
+                                Assignment locked: Requires {hasHod ? 'both HOD and Dean' : 'Dean'} verification first.
                               </p>
                             )}
                           </div>
@@ -620,26 +701,34 @@ export default function ScholarsPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-border bg-background/50 flex gap-3 justify-end shrink-0">
+              <div className="px-6 py-4 border-t border-border bg-background/50 flex gap-3 justify-end shrink-0">
                 <button
                   type="button"
                   onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }}
                   className="px-6 py-2.5 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
                 >
-                  Cancel
+                  {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) ? 'Cancel' : 'Close'}
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2.5 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
-                >
-                  {submitting ? 'Saving...' : (isEditModalOpen ? 'Save Changes' : 'Create Scholar')}
-                </button>
+                {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2.5 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
+                  >
+                    {submitting ? 'Saving...' : (isEditModalOpen ? 'Save Changes' : 'Create Scholar')}
+                  </button>
+                )}
               </div>
             </form>
-            ) : (
+            ) : activeTab === 'matriculation' ? (
               <div className="flex-1 overflow-y-auto"><MatriculationView scholarId={formData.id} /></div>
-            )}
+            ) : activeTab === 'exams' ? (
+              <div className="flex-1 overflow-y-auto"><ExamsView scholarId={formData.id} currentUser={currentUser} /></div>
+            ) : activeTab === 'drc-presentation' ? (
+              <div className="flex-1 overflow-y-auto"><PresentationView scholarId={formData.id!} currentUser={currentUser} type="DRC" /></div>
+            ) : activeTab === 'src-presentation' ? (
+              <div className="flex-1 overflow-y-auto"><PresentationView scholarId={formData.id!} currentUser={currentUser} type="SRC" /></div>
+            ) : null}
           </div>
         </div>
       )}

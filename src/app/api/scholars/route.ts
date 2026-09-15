@@ -47,9 +47,20 @@ export async function GET(req: NextRequest) {
 
   const scholars = await prisma.scholar.findMany({
     where: whereClause,
-    include: {
-      school: true,
-      department: true, verifications: true, supervisor: true, courses: true
+    select: {
+      id: true,
+      scholarId: true,
+      enrollmentNumber: true,
+      firstName: true,
+      lastName: true,
+      program: true,
+      createdAt: true,
+      verificationStatus: true,
+      status: true,
+      school: { select: { schoolName: true } },
+      department: { select: { departmentName: true } },
+      supervisor: { select: { status: true } },
+      verifications: { select: { stage: true } }
     },
     orderBy: { createdAt: 'desc' }
   });

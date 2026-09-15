@@ -60,8 +60,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       } else {
         await prisma.supervisorAssignment.upsert({
           where: { scholarId: id },
-          create: { scholarId: id, supervisorId, assignedById: auth.id },
-          update: { supervisorId, assignedById: auth.id }
+          create: { scholarId: id, supervisorId, assignedById: auth.id as string, status: 'ASSIGNED' },
+          update: { supervisorId, assignedById: auth.id as string, status: 'ASSIGNED' }
         });
       }
     }
@@ -70,11 +70,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       await prisma.scholarCourse.deleteMany({ where: { scholarId: id } });
       if (Array.isArray(data.courseIds) && data.courseIds.length > 0) {
         await prisma.scholarCourse.createMany({
-          data: data.courseIds.map(courseId => ({
+          data: data.courseIds.map((courseId: string) => ({
             scholarId: id,
             courseId,
-            allocatedById: auth.id
+            allocatedById: auth.id as string
           }))
+        });
+        
+        // Reset supervisor assignment status so the assignment block gets re-verified
+        await prisma.supervisorAssignment.updateMany({
+          where: { scholarId: id },
+          data: { status: 'ASSIGNED' }
         });
       }
     }
@@ -96,6 +102,35 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     await prisma.scholar.delete({ where: { id } });
     return NextResponse.json({ message: 'Scholar deleted' });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await checkAuth(req);
+  if (!auth) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const scholar = await prisma.scholar.findUnique({
+      where: { id },
+      include: {
+        school: true,
+        department: true,
+        verifications: true,
+        supervisor: true,
+        courses: { include: { course: true } }
+      }
+    });
+
+    if (!scholar) {
+      return NextResponse.json({ error: 'Scholar not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ scholar });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
