@@ -41,6 +41,8 @@ export async function GET(req: NextRequest) {
     // Optionally supervisors only see their own scholars
     // whereClause = { supervisor: { supervisorId: user.id } }; // Example for future
     whereClause = {}; 
+  } else if (user.role.name === 'SCHOLAR' || user.role.name === 'STUDENT') {
+    whereClause = { email: user.email };
   } else {
     whereClause = {};
   }

@@ -213,13 +213,15 @@ export default function ScholarsPage() {
           <h1 className="text-2xl font-bold text-foreground">Ph.D. Scholars</h1>
           <p className="text-sm text-muted mt-1">Manage Ph.D. scholars across all university programs.</p>
         </div>
-        <button 
-          onClick={openAddModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
-        >
-          <Plus className="w-4 h-4" />
-          Add Scholar
-        </button>
+        {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
+          <button 
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
+          >
+            <Plus className="w-4 h-4" />
+            Add Scholar
+          </button>
+        )}
       </div>
 
       {/* Data Table */}
@@ -248,7 +250,11 @@ export default function ScholarsPage() {
                 </tr>
               ) : (
                 scholars.map((scholar) => (
-                  <tr key={scholar.id} className="hover:bg-surface-hover transition-colors">
+                  <tr 
+                    key={scholar.id} 
+                    onClick={() => openEditModal(scholar)}
+                    className="hover:bg-surface-hover transition-colors cursor-pointer"
+                  >
                     <td className="py-4 px-6">
                       <p className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-light text-primary font-bold text-xs mb-1">
                         {scholar.scholarId}
@@ -299,17 +305,19 @@ export default function ScholarsPage() {
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button 
-                          onClick={() => openEditModal(scholar)}
+                          onClick={(e) => { e.stopPropagation(); openEditModal(scholar); }}
                           className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => confirmDelete(scholar.id)}
-                          className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); confirmDelete(scholar.id); }}
+                            className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -330,7 +338,7 @@ export default function ScholarsPage() {
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <GraduationCap className="w-5 h-5 text-primary" />
                   </div>
-                  {isEditModalOpen ? 'Edit Scholar' : 'New Scholar'}
+                  {isEditModalOpen ? (['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) ? 'Edit Scholar' : 'View Scholar') : 'New Scholar'}
                 </h3>
               </div>
               
@@ -681,7 +689,9 @@ export default function ScholarsPage() {
                               className={`w-full px-4 py-2 rounded-lg border ${!isVerified ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-blue-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20'} text-sm`}
                             >
                               <option value="">-- Select Supervisor --</option>
-                              {supervisors.map(s => <option key={s.id} value={s.id}>{s.name} ({s.email})</option>)}
+                              {supervisors
+                                .filter(s => !formData.departmentId || s.departmentId === formData.departmentId)
+                                .map(s => <option key={s.id} value={s.id}>{s.name} ({s.email})</option>)}
                             </select>
                             {!isVerified && (
                               <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">

@@ -100,8 +100,8 @@ export default function UsersPage() {
   };
 
   const selectedRole = roles.find(r => r.id === formData.roleId);
-  const needsSchool = selectedRole && (selectedRole.name === 'DEAN' || selectedRole.name === 'COORDINATOR');
-  const needsDepartment = selectedRole && (selectedRole.name === 'HOD');
+  const needsSchool = selectedRole && (['DEAN', 'COORDINATOR', 'HOD', 'SUPERVISOR'].includes(selectedRole.name));
+  const needsDepartment = selectedRole && (['HOD', 'SUPERVISOR'].includes(selectedRole.name));
 
   const openAddModal = () => {
     setFormData({ id: '', name: '', email: '', password: '', roleId: '', schoolId: '', departmentId: '' });
@@ -369,8 +369,10 @@ export default function UsersPage() {
                   <label className="block text-sm font-medium text-foreground mb-1.5">Associated Department</label>
                   <select required value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
                     <option value="">Select Department</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.departmentName}</option>
+                    {departments
+                      .filter(d => !formData.schoolId || d.schoolId === formData.schoolId)
+                      .map(d => (
+                        <option key={d.id} value={d.id}>{d.departmentName}</option>
                     ))}
                   </select>
                 </div>

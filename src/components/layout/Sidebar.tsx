@@ -17,8 +17,8 @@ import {
 import { useState, useEffect } from "react";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, allowed: ["SUPER_ADMIN", "RDC_ADMIN", "VC", "DEAN", "COORDINATOR", "HOD", "SUPERVISOR"] },
-  { name: "Ph.D. Scholars", href: "/scholars", icon: GraduationCap, allowed: ["SUPER_ADMIN", "RDC_ADMIN", "VC", "DEAN", "COORDINATOR", "HOD", "SUPERVISOR"] },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, allowed: ["SUPER_ADMIN", "RDC_ADMIN", "VC", "DEAN", "COORDINATOR", "HOD", "SUPERVISOR", "SCHOLAR", "STUDENT"] },
+  { name: "Ph.D. Scholars", href: "/scholars", icon: GraduationCap, allowed: ["SUPER_ADMIN", "RDC_ADMIN", "VC", "DEAN", "COORDINATOR", "HOD", "SUPERVISOR", "SCHOLAR", "STUDENT"] },
   { name: "Users", href: "/users", icon: Users, allowed: ["SUPER_ADMIN", "RDC_ADMIN"] },
   {
     name: "System Settings",

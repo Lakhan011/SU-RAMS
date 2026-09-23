@@ -1,4 +1,4 @@
-﻿# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
@@ -59,3 +59,12 @@ next-env.d.ts
 # uploaded files
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Temporary/test scripts not needed in production
+clean_matriculation.js
+create_login.js
+seed_exam.js
+test-api.js
+test-prisma.js
+test-put.js
+update_modals.js
