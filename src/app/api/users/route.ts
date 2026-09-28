@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
@@ -99,9 +99,12 @@ export async function POST(req: NextRequest) {
       const dept = await prisma.department.findUnique({ where: { id: departmentId } });
       finalDepartmentId = departmentId;
       finalSchoolId = dept?.schoolId; // implicitly link to school
-    } else if (role.name === 'VC' || role.name === 'RDC_ADMIN' || role.name === 'SUPER_ADMIN' || role.name === 'SUPERVISOR') {
+    } else if (role.name === 'VC' || role.name === 'RDC_ADMIN' || role.name === 'SUPER_ADMIN') {
       finalSchoolId = null;
       finalDepartmentId = null;
+    } else if (role.name === 'SUPERVISOR') {
+      finalSchoolId = schoolId || null;
+      finalDepartmentId = departmentId || null;
     } else {
        finalSchoolId = schoolId || null;
        finalDepartmentId = departmentId || null;

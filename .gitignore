@@ -60,11 +60,4 @@ next-env.d.ts
 public/uploads/*
 !public/uploads/.gitkeep
 
-# Temporary/test scripts not needed in production
-clean_matriculation.js
-create_login.js
-seed_exam.js
-test-api.js
-test-prisma.js
-test-put.js
-update_modals.js
+

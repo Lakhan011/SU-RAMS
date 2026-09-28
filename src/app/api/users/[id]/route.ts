@@ -59,9 +59,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       const dept = await prisma.department.findUnique({ where: { id: departmentId } });
       finalDepartmentId = departmentId;
       finalSchoolId = dept?.schoolId;
-    } else if (role.name === 'VC' || role.name === 'RDC_ADMIN' || role.name === 'SUPER_ADMIN' || role.name === 'SUPERVISOR') {
+    } else if (role.name === 'VC' || role.name === 'RDC_ADMIN' || role.name === 'SUPER_ADMIN') {
       finalSchoolId = null;
       finalDepartmentId = null;
+    } else if (role.name === 'SUPERVISOR') {
+      finalSchoolId = schoolId || null;
+      finalDepartmentId = departmentId || null;
     } else {
        finalSchoolId = schoolId || null;
        finalDepartmentId = departmentId || null;

@@ -318,8 +318,8 @@ export default function UsersPage() {
       {/* Add / Edit User Modal */}
       {(isModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-surface w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-border animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="bg-surface w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-border flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
               <h2 className="text-xl font-bold text-foreground">
                 {isEditModalOpen ? 'Edit User' : 'Create New User'}
               </h2>
@@ -327,58 +327,60 @@ export default function UsersPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Name</label>
-                <input required type="text" placeholder="e.g. Dr. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                <input required type="email" placeholder="e.g. john.doe@sharda.edu" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  {isEditModalOpen ? 'Password (leave blank to keep current)' : 'Password'}
-                </label>
-                <input required={!isEditModalOpen} type="password" placeholder={isEditModalOpen ? 'Leave blank to keep unchanged' : 'Create a strong password'} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Role</label>
-                <select required value={formData.roleId} onChange={e => handleRoleChange(e.target.value)} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
-                  <option value="">Select Role</option>
-                  {roles.map(r => (
-                    <option key={r.id} value={r.id}>{r.name.replace('_', ' ')}</option>
-                  ))}
-                </select>
-              </div>
-
-              {needsSchool && (
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Associated School</label>
-                  <select required value={formData.schoolId} onChange={e => setFormData({...formData, schoolId: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
-                    <option value="">Select School</option>
-                    {schools.map(s => (
-                      <option key={s.id} value={s.id}>{s.schoolName}</option>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Name</label>
+                  <input required type="text" placeholder="e.g. Dr. John Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+                  <input required type="email" placeholder="e.g. john.doe@sharda.edu" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    {isEditModalOpen ? 'Password (leave blank to keep current)' : 'Password'}
+                  </label>
+                  <input required={!isEditModalOpen} type="password" placeholder={isEditModalOpen ? 'Leave blank to keep unchanged' : 'Create a strong password'} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Role</label>
+                  <select required value={formData.roleId} onChange={e => handleRoleChange(e.target.value)} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                    <option value="">Select Role</option>
+                    {roles.map(r => (
+                      <option key={r.id} value={r.id}>{r.name.replace('_', ' ')}</option>
                     ))}
                   </select>
                 </div>
-              )}
 
-              {needsDepartment && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Associated Department</label>
-                  <select required value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
-                    <option value="">Select Department</option>
-                    {departments
-                      .filter(d => !formData.schoolId || d.schoolId === formData.schoolId)
-                      .map(d => (
-                        <option key={d.id} value={d.id}>{d.departmentName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                {needsSchool && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Associated School</label>
+                    <select required value={formData.schoolId} onChange={e => setFormData({...formData, schoolId: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                      <option value="">Select School</option>
+                      {schools.map(s => (
+                        <option key={s.id} value={s.id}>{s.schoolName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-              <div className="pt-4 flex justify-end gap-3">
+                {needsDepartment && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Associated Department</label>
+                    <select required value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                      <option value="">Select Department</option>
+                      {departments
+                        .filter(d => !formData.schoolId || d.schoolId === formData.schoolId)
+                        .map(d => (
+                          <option key={d.id} value={d.id}>{d.departmentName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 border-t border-border bg-surface shrink-0 flex justify-end gap-3">
                 <button type="button" onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }} className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors">Cancel</button>
                 <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50">
                   {submitting ? 'Saving...' : (isEditModalOpen ? 'Save Changes' : 'Create User')}
