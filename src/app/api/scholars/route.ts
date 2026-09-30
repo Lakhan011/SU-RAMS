@@ -38,9 +38,7 @@ export async function GET(req: NextRequest) {
     if (user.departmentId) whereClause = { departmentId: user.departmentId };
     else whereClause = { id: 'none' };
   } else if (user.role.name === 'SUPERVISOR') {
-    // Optionally supervisors only see their own scholars
-    // whereClause = { supervisor: { supervisorId: user.id } }; // Example for future
-    whereClause = {}; 
+    whereClause = { supervisor: { supervisorId: user.id } };
   } else if (user.role.name === 'SCHOLAR' || user.role.name === 'STUDENT') {
     whereClause = { email: user.email };
   } else {
@@ -59,6 +57,8 @@ export async function GET(req: NextRequest) {
       createdAt: true,
       verificationStatus: true,
       status: true,
+      schoolId: true,
+      departmentId: true,
       school: { select: { schoolName: true } },
       department: { select: { departmentName: true } },
       supervisor: { select: { status: true } },

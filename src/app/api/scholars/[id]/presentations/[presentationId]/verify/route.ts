@@ -19,7 +19,7 @@ async function checkAuth(req: NextRequest) {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string, presentationId: string }> }) {
   const auth = await checkAuth(req);
-  if (!auth || !['SUPER_ADMIN', 'ADMIN', 'VC'].includes(auth.role as string)) {
+  if (!auth || !['RDC_ADMIN', 'SUPER_ADMIN', 'ADMIN', 'VC'].includes(auth.role as string)) {
     return NextResponse.json({ error: "Forbidden. RDC member access required." }, { status: 403 });
   }
 

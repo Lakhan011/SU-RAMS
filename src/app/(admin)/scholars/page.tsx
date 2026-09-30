@@ -331,9 +331,9 @@ export default function ScholarsPage() {
       {/* Add/Edit Scholar Modal */}
       {(isModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-surface w-full max-w-5xl max-h-[95vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white shadow-sm shrink-0 relative z-10">
-              <div className="flex-1 flex items-center">
+          <div className="bg-surface w-full max-w-6xl max-h-[95vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-white shadow-sm shrink-0 relative z-10 gap-4">
+              <div className="flex items-center shrink-0">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <GraduationCap className="w-5 h-5 text-primary" />
@@ -342,8 +342,8 @@ export default function ScholarsPage() {
                 </h3>
               </div>
               
-              <div className="shrink-0 flex justify-center mx-4">
-                <div className="flex bg-slate-100 p-1 rounded-lg">
+              <div className="flex-1 min-w-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex justify-start lg:justify-center">
+                <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
                   <button
                     type="button"
                     className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'profile' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
@@ -395,12 +395,12 @@ export default function ScholarsPage() {
                 </div>
               </div>
 
-              <div className="flex-1 flex justify-end">
+              <div className="flex justify-end shrink-0 pl-2">
                 <button 
                   onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </div>
             </div>

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { PrismaClient } from '@prisma/client';
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // Always trust DB as source of truth to avoid stale JWT bugs
     const user = await prisma.user.findUnique({
       where: { id: payload.id as string },
-      select: { name: true, role: true, schoolId: true }
+      select: { id: true, name: true, role: true, schoolId: true }
     });
 
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -37,6 +37,10 @@ export async function GET(request: NextRequest) {
       scholars = await prisma.scholar.count({ where: { schoolId: schoolId as string } });
     }
 
+    if (roleName === 'SUPERVISOR') {
+      scholars = await prisma.scholar.count({ where: { supervisor: { supervisorId: user.id } } });
+    }
+
     let stats = [];
 
     if (roleName === 'COORDINATOR') {
@@ -44,6 +48,10 @@ export async function GET(request: NextRequest) {
         { label: 'Total Departments', value: departments, change: 0, icon: 'Briefcase' },
         { label: 'Courses', value: courses, change: 0, icon: 'BookOpen' },
         { label: 'Ph.D. Scholars', value: scholars, change: 0, icon: 'GraduationCap' },
+      ];
+    } else if (roleName === 'SUPERVISOR') {
+      stats = [
+        { label: 'My Ph.D. Scholars', value: scholars, change: 0, icon: 'GraduationCap' },
       ];
     } else {
       stats = [

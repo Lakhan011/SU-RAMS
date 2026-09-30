@@ -70,7 +70,7 @@ export default function ExamsView({ scholarId, currentUser }: { scholarId: strin
   };
 
   const isCoordinator = currentUser?.rawRole === "COORDINATOR" || currentUser?.rawRole === "SUPER_ADMIN";
-  const isRdcMember = ["SUPER_ADMIN", "ADMIN", "VC"].includes(currentUser?.rawRole);
+  const isRdcMember = ["RDC_ADMIN", "SUPER_ADMIN", "ADMIN", "VC"].includes(currentUser?.rawRole);
 
   const [verifyingResultId, setVerifyingResultId] = useState<string | null>(null);
 
