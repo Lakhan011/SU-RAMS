@@ -1,10 +1,9 @@
 'use client';
 
-import { Building2, Briefcase, BookOpen, UserCheck, GraduationCap, ArrowUp, ArrowDown, Plus, TrendingUp } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { trafficData, recentActivity, topContent } from '@/data/mock';
-import { formatNumber, timeAgo } from '@/lib/utils';
+import { Building2, Briefcase, BookOpen, UserCheck, GraduationCap, Users } from 'lucide-react';
+import { formatNumber, timeAgo, formatRoleName } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { useLayoutStore } from '@/store/useLayoutStore';
 
 const iconMap: Record<string, any> = {
   Building2,
@@ -12,6 +11,7 @@ const iconMap: Record<string, any> = {
   BookOpen,
   UserCheck,
   GraduationCap,
+  Users
 };
 
 const statColors = [
@@ -21,68 +21,58 @@ const statColors = [
   { bg: 'bg-info-light', text: 'text-info' },
 ];
 
-const activityColors: Record<string, string> = {
-  post: '#6366f1',
-  comment: '#10b981',
-  media: '#f59e0b',
-  page: '#3b82f6',
-  user: '#8b5cf6',
-};
-
-const statusBadgeClasses: Record<string, string> = {
-  published: 'bg-success-light text-success',
-  draft: 'bg-warning-light text-warning',
-  archived: 'bg-muted/10 text-muted',
-};
-
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white rounded-lg shadow-lg border border-border-light p-3 text-sm">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} className="text-muted" style={{ color: entry.color }}>
-          {entry.dataKey === 'views' ? 'Views' : 'Visitors'}: {formatNumber(entry.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
-
 export default function DashboardPage() {
-  const [data, setData] = useState<{name: string, stats: any[]} | null>(null);
+  const setHeader = useLayoutStore((state) => state.setHeader);
+  const resetHeader = useLayoutStore((state) => state.resetHeader);
+
+  const [data, setData] = useState<{
+    name: string;
+    stats: any[];
+    recentScholars: any[];
+    recentUsers: any[];
+  } | null>(null);
+
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/dashboard/stats')
       .then(res => res.json())
       .then(resData => {
-        if (resData.stats) setData(resData);
+        if (resData.stats) {
+          setData(resData);
+        }
+        setLoading(false);
       });
   }, []);
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  useEffect(() => {
+    const today = new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    if (data?.name) {
+      setHeader(`Welcome back, ${data.name}`, today);
+    } else {
+      setHeader('Dashboard', today);
+    }
+
+    return () => resetHeader();
+  }, [data?.name, setHeader, resetHeader]);
+
+  if (loading) {
+    return <div className="p-6 text-center text-muted text-sm">Loading dashboard data...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Welcome back, {data?.name || 'Loading...'}</h1>
-          <p className="text-sm text-muted mt-1">{today}</p>
-        </div>
-      </div>
-
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {(data?.stats || []).map((stat, index) => {
-          const IconComponent = iconMap[stat.icon];
+          const IconComponent = iconMap[stat.icon] || Users;
           const colors = statColors[index % statColors.length];
-          const isPositive = stat.change >= 0;
 
           return (
             <div
@@ -90,8 +80,8 @@ export default function DashboardPage() {
               className="bg-surface rounded-xl shadow-sm border border-border p-6 hover:shadow-md transition-shadow duration-200"
             >
               <div className="flex items-start justify-between">
-                <div className={`p-2.5 rounded-lg ${colors.bg}`}>
-                  {IconComponent && <IconComponent className={`w-5 h-5 ${colors.text}`} />}
+                <div className={`p-2.5 rounded-[5px] ${colors.bg}`}>
+                  <IconComponent className={`w-5 h-5 ${colors.text}`} />
                 </div>
               </div>
               <p className="text-sm text-muted mt-3">{stat.label}</p>
@@ -101,138 +91,102 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Traffic Chart */}
-      <div className="bg-surface rounded-xl shadow-sm border border-border p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Traffic Overview</h2>
-        </div>
-        <div className="w-full h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trafficData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="visitorsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e6ef" />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7294' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: '#6b7294' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="views"
-                stroke="#6366f1"
-                strokeWidth={2}
-                fill="url(#viewsGradient)"
-              />
-              <Area
-                type="monotone"
-                dataKey="visitors"
-                stroke="#10b981"
-                strokeWidth={2}
-                fill="url(#visitorsGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex items-center gap-6 mt-4">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-primary" />
-            <span className="text-xs text-muted">Views</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-success" />
-            <span className="text-xs text-muted">Visitors</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Two Columns: Recent Activity + Top Content */}
+      {/* Two Columns: Recent Scholars + Recent Users */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div className="bg-surface rounded-xl shadow-sm border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-5">Recent Activity</h2>
-          <div className="space-y-5">
-            {recentActivity.map((item, index) => (
-              <div key={item.id} className="flex gap-3">
-                {/* Timeline dot + line */}
-                <div className="flex flex-col items-center">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0"
-                    style={{ backgroundColor: activityColors[item.type] }}
-                  />
-                  {index < recentActivity.length - 1 && (
-                    <div className="w-px flex-1 bg-border-light mt-1.5" />
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0 pb-4">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
-                      style={{ backgroundColor: activityColors[item.type] }}
-                    >
-                      {item.avatar}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-foreground">
-                        <span className="font-semibold">{item.user}</span>{' '}
-                        <span className="text-muted">{item.action}</span>{' '}
-                        <span className="font-medium">{item.target}</span>
-                      </p>
-                      <p className="text-xs text-muted-light mt-0.5">{timeAgo(item.time)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Content */}
-        <div className="bg-surface rounded-xl shadow-sm border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-5">Top Content</h2>
-          <div className="overflow-x-auto">
+        
+        {/* Recent Scholars */}
+        <div className="bg-surface rounded-xl shadow-sm border border-border p-6 flex flex-col min-h-[400px]">
+          <h2 className="text-lg font-semibold text-foreground mb-5 flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-primary" />
+            Recently Registered Scholars
+          </h2>
+          <div className="overflow-x-auto flex-1">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border-light">
-                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wide pb-3">Title</th>
-                  <th className="text-right text-xs font-semibold text-muted uppercase tracking-wide pb-3">Views</th>
-                  <th className="text-right text-xs font-semibold text-muted uppercase tracking-wide pb-3">Status</th>
+                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wide pb-3 px-2">Scholar</th>
+                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wide pb-3 px-2">Program</th>
+                  <th className="text-right text-xs font-semibold text-muted uppercase tracking-wide pb-3 px-2">Joined</th>
                 </tr>
               </thead>
               <tbody>
-                {topContent.map((item) => (
+                {data?.recentScholars?.map((scholar) => (
                   <tr
-                    key={item.id}
+                    key={scholar.id}
                     className="border-b border-border-light last:border-0 hover:bg-surface-hover transition-colors"
                   >
-                    <td className="py-3 pr-3">
-                      <p className="text-sm font-medium text-foreground truncate max-w-[220px]">
-                        {item.title}
+                    <td className="py-3 px-2">
+                      <p className="text-sm font-semibold text-foreground truncate max-w-[200px]">
+                        {scholar.firstName} {scholar.lastName}
                       </p>
+                      <p className="text-xs text-muted truncate max-w-[200px]">{scholar.email}</p>
                     </td>
-                    <td className="py-3 text-right">
-                      <span className="text-sm font-semibold text-foreground">{formatNumber(item.views)}</span>
+                    <td className="py-3 px-2">
+                      <p className="text-sm font-medium text-foreground">{scholar.program || 'N/A'}</p>
+                      <p className="text-xs text-muted">{scholar.department?.departmentCode || 'No Dept'}</p>
                     </td>
-                    <td className="py-3 text-right">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusBadgeClasses[item.status] || 'bg-muted/10 text-muted'}`}>
-                        {item.status}
-                      </span>
+                    <td className="py-3 px-2 text-right">
+                      <span className="text-sm text-muted">{timeAgo(scholar.createdAt)}</span>
                     </td>
                   </tr>
                 ))}
+                {(!data?.recentScholars || data.recentScholars.length === 0) && (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-sm text-muted">No recent scholars found.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* Recent Users */}
+        <div className="bg-surface rounded-xl shadow-sm border border-border p-6 flex flex-col min-h-[400px]">
+          <h2 className="text-lg font-semibold text-foreground mb-5 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-primary" />
+            Recently Added Users
+          </h2>
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border-light">
+                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wide pb-3 px-2">User</th>
+                  <th className="text-left text-xs font-semibold text-muted uppercase tracking-wide pb-3 px-2">Role</th>
+                  <th className="text-right text-xs font-semibold text-muted uppercase tracking-wide pb-3 px-2">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.recentUsers?.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="border-b border-border-light last:border-0 hover:bg-surface-hover transition-colors"
+                  >
+                    <td className="py-3 px-2">
+                      <p className="text-sm font-semibold text-foreground truncate max-w-[200px]">
+                        {user.name}
+                      </p>
+                      <p className="text-xs text-muted truncate max-w-[200px]">{user.email}</p>
+                    </td>
+                    <td className="py-3 px-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-[5px] text-xs font-semibold bg-primary-light text-primary border border-primary/20 whitespace-nowrap">
+                        {formatRoleName(user.role?.name)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-right">
+                      <span className="text-sm text-muted whitespace-nowrap">{timeAgo(user.createdAt)}</span>
+                    </td>
+                  </tr>
+                ))}
+                {(!data?.recentUsers || data.recentUsers.length === 0) && (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-sm text-muted">No recent users found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );

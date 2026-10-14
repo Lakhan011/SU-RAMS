@@ -63,9 +63,33 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    const recentScholars = await prisma.scholar.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: { department: true }
+    });
+
+    const recentUsers = await prisma.user.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: { role: true }
+    });
+
+    // Count pending verifications generically across the system (e.g., pending scholars)
+    const pendingVerifications = await prisma.scholar.count({
+      where: { matriculationStatus: 'PENDING_APPROVAL' }
+    });
+
+    // Add pendingVerifications as a stat card for admin
+    if (roleName === 'SUPER_ADMIN' || roleName === 'RDC_ADMIN') {
+      stats.unshift({ label: 'Pending Approvals', value: pendingVerifications, change: 0, icon: 'BookOpen' });
+    }
+
     return NextResponse.json({
       name: user.name || 'User',
-      stats
+      stats,
+      recentScholars,
+      recentUsers
     });
   } catch (error) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });

@@ -1,15 +1,31 @@
 'use client';
 
-import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Plus, Search, Edit, Trash2, X, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLayoutStore } from '@/store/useLayoutStore';
 import toast from 'react-hot-toast';
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  ColumnDef,
+  SortingState,
+} from '@tanstack/react-table';
 
 export default function CoursesPage() {
+  const setHeader = useLayoutStore((state) => state.setHeader);
+  const resetHeader = useLayoutStore((state) => state.resetHeader);
+
   const [courses, setCourses] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('ALL');
+  
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [sorting, setSorting] = useState<SortingState>([]);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newCourse, setNewCourse] = useState({ courseCode: '', courseName: '', status: 'ACTIVE', departmentId: '' });
@@ -36,6 +52,25 @@ export default function CoursesPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const openAddModal = useCallback(() => {
+    setIsAddModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    setHeader(
+      "Courses Directory",
+      "Manage university courses.",
+      <button 
+        onClick={openAddModal}
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[5px] bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
+      >
+        <Plus className="w-4 h-4" />
+        Add Course
+      </button>
+    );
+    return () => resetHeader();
+  }, [setHeader, resetHeader, openAddModal]);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -122,122 +157,234 @@ export default function CoursesPage() {
     }
   };
 
-  const filteredCourses = courses.filter(course => {
-    const matchesDept = selectedDepartment === 'ALL' || course.departmentId === selectedDepartment;
-    const matchesSearch = course.courseCode.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          course.courseName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesDept && matchesSearch;
+  const filteredData = useMemo(() => {
+    let list = courses;
+    if (departmentFilter !== 'all') {
+      list = list.filter((c) => c.departmentId === departmentFilter);
+    }
+    return list;
+  }, [courses, departmentFilter]);
+
+  const columns = useMemo<ColumnDef<any>[]>(
+    () => [
+      {
+        accessorFn: (row) => row.courseCode,
+        id: 'courseCode',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Course Code
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-[5px] bg-primary-light text-primary font-bold text-xs">
+            {row.original.courseCode}
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => row.courseName,
+        id: 'courseName',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Course Name
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => (
+          <p className="text-sm font-medium text-foreground">{row.original.courseName}</p>
+        ),
+      },
+      {
+        accessorFn: (row) => row.department?.departmentName,
+        id: 'department',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Department
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => (
+          <span className="text-sm text-muted">{row.original.department?.departmentName}</span>
+        ),
+      },
+      {
+        accessorFn: (row) => row._count?.scholarCourses || 0,
+        id: 'scholarsEnrolled',
+        header: () => <span className="uppercase">Scholars Enrolled</span>,
+        cell: ({ row }) => (
+          <span className="text-sm font-medium text-foreground">{row.original._count?.scholarCourses || 0}</span>
+        ),
+      },
+      {
+        accessorFn: (row) => row.status,
+        id: 'status',
+        header: () => <span className="uppercase">Status</span>,
+        cell: ({ row }) => (
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-[5px] text-xs font-medium ${
+            row.original.status === 'ACTIVE' ? 'bg-success-light text-success' : 'bg-warning-light text-warning'
+          }`}>
+            {row.original.status}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: () => <span className="uppercase flex justify-end">Actions</span>,
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-2">
+            <button 
+              onClick={() => openEditModal(row.original)}
+              className="p-2 text-muted hover:text-primary transition-colors rounded-[5px] hover:bg-primary-light"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => confirmDelete(row.original.id)}
+              className="p-2 text-muted hover:text-danger transition-colors rounded-[5px] hover:bg-danger-light"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ),
+      }
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onGlobalFilterChange: setGlobalFilter,
   });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Courses Directory</h1>
-          <p className="text-sm text-muted mt-1">Manage university courses.</p>
-        </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
-        >
-          <Plus className="w-4 h-4" />
-          Add Course
-        </button>
-      </div>
-
+      
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-2">
+        <div className="relative w-full sm:w-64">
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="w-full pl-4 pr-10 py-2.5 rounded-[5px] border border-border bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+          >
+            <option value="all">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.departmentName}</option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </div>
+        </div>
+
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
-            placeholder="Search courses by code or name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+            placeholder="Search courses..."
+            value={globalFilter ?? ''}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-[5px] border border-border bg-surface text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
-        <select
-          value={selectedDepartment}
-          onChange={(e) => setSelectedDepartment(e.target.value)}
-          className="px-4 py-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm sm:w-64"
-        >
-          <option value="ALL">All Departments</option>
-          {departments.map(dept => (
-            <option key={dept.id} value={dept.id}>{dept.departmentName}</option>
-          ))}
-        </select>
       </div>
 
       {/* Data Table */}
-      <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full">
             <thead>
-              <tr className="bg-background border-b border-border">
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Course Code</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Course Name</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Department</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Scholars Enrolled</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider text-center">Status</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider text-right">Actions</th>
-              </tr>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-border bg-background/50">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="text-left text-xs font-semibold text-muted tracking-wider px-5 py-3.5">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">Loading courses...</td>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    Loading courses...
+                  </td>
                 </tr>
-              ) : filteredCourses.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">No courses found matching criteria</td>
-                </tr>
-              ) : (
-                filteredCourses.map((course) => (
-                  <tr key={course.id} className="hover:bg-surface-hover transition-colors">
-                    <td className="py-4 px-6">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-light text-primary font-bold text-xs">
-                        {course.courseCode}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-sm font-medium text-foreground">{course.courseName}</p>
-                    </td>
-                    <td className="py-4 px-6 text-sm text-muted">
-                      {course.department?.departmentName}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-foreground">
-                      {course._count?.scholarCourses || 0}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        course.status === 'ACTIVE' ? 'bg-success-light text-success' : 'bg-warning-light text-warning'
-                      }`}>
-                        {course.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => openEditModal(course)}
-                          className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => confirmDelete(course.id)}
-                          className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border-light last:border-b-0 hover:bg-background/60">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-5 py-4">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    No results.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border bg-background/30">
+          <div className="text-sm text-muted">
+            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            {table.getPageCount() || 1}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="p-2 rounded-[5px] border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="p-2 rounded-[5px] border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -249,7 +396,7 @@ export default function CoursesPage() {
               <h3 className="text-lg font-semibold text-foreground">Add New Course</h3>
               <button 
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-[5px] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -263,7 +410,7 @@ export default function CoursesPage() {
                   value={newCourse.courseCode}
                   onChange={(e) => setNewCourse({ ...newCourse, courseCode: e.target.value })}
                   placeholder="e.g. CS101"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                   autoFocus
                 />
               </div>
@@ -275,7 +422,7 @@ export default function CoursesPage() {
                   value={newCourse.courseName}
                   onChange={(e) => setNewCourse({ ...newCourse, courseName: e.target.value })}
                   placeholder="e.g. Introduction to Computer Science"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 />
               </div>
 
@@ -284,7 +431,7 @@ export default function CoursesPage() {
                 <select
                   value={newCourse.departmentId}
                   onChange={(e) => setNewCourse({ ...newCourse, departmentId: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 >
                   <option value="" disabled>Select a department...</option>
                   {departments.map(dept => (
@@ -298,7 +445,7 @@ export default function CoursesPage() {
                 <select
                   value={newCourse.status}
                   onChange={(e) => setNewCourse({ ...newCourse, status: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
@@ -309,14 +456,14 @@ export default function CoursesPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-[5px] shadow-sm hover:shadow transition-all disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : 'Save Course'}
                 </button>
@@ -334,7 +481,7 @@ export default function CoursesPage() {
               <h3 className="text-lg font-semibold text-foreground">Edit Course</h3>
               <button 
                 onClick={() => setIsEditModalOpen(false)}
-                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-[5px] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -348,8 +495,7 @@ export default function CoursesPage() {
                   value={editingCourse.courseCode}
                   onChange={(e) => setEditingCourse({ ...editingCourse, courseCode: e.target.value })}
                   placeholder="e.g. CS101"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                  autoFocus
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 />
               </div>
               
@@ -360,7 +506,7 @@ export default function CoursesPage() {
                   value={editingCourse.courseName}
                   onChange={(e) => setEditingCourse({ ...editingCourse, courseName: e.target.value })}
                   placeholder="e.g. Introduction to Computer Science"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 />
               </div>
 
@@ -369,7 +515,7 @@ export default function CoursesPage() {
                 <select
                   value={editingCourse.departmentId}
                   onChange={(e) => setEditingCourse({ ...editingCourse, departmentId: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 >
                   <option value="" disabled>Select a department...</option>
                   {departments.map(dept => (
@@ -383,7 +529,7 @@ export default function CoursesPage() {
                 <select
                   value={editingCourse.status}
                   onChange={(e) => setEditingCourse({ ...editingCourse, status: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
@@ -394,22 +540,23 @@ export default function CoursesPage() {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-[5px] shadow-sm hover:shadow transition-all disabled:opacity-50"
                 >
-                  {submitting ? 'Saving...' : 'Save Changes'}
+                  {submitting ? 'Updating...' : 'Update Course'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -425,18 +572,16 @@ export default function CoursesPage() {
             </div>
             <div className="px-6 py-4 bg-background border-t border-border flex gap-3 justify-end">
               <button
-                type="button"
-                onClick={() => { setIsDeleteModalOpen(false); setDeletingId(null); }}
-                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleDelete}
-                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-red-600 rounded-lg shadow-sm hover:shadow transition-all"
+                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-danger/90 rounded-[5px] shadow-sm hover:shadow transition-all"
               >
-                Yes, Delete
+                Delete
               </button>
             </div>
           </div>

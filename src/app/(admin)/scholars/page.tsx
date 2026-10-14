@@ -1,87 +1,49 @@
 'use client';
 
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, X, Check, XCircle, FileText, User, UserCog, Mail, Phone, GraduationCap, Building2, MapPin, AlignLeft, Calendar, FileCheck, ExternalLink, Download, Loader2, BookOpen, MonitorPlay } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ArrowUpDown, ChevronLeft, ChevronRight, Building2, MapPin, FileCheck, UserCog, Hash, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
-import MatriculationView from '@/components/scholars/MatriculationView';
-import ExamsView from '@/components/scholars/ExamsView';
-import PresentationView from '@/components/scholars/PresentationView';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLayoutStore } from '@/store/useLayoutStore';
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  ColumnDef,
+  SortingState,
+} from '@tanstack/react-table';
 
 export default function ScholarsPage() {
   const router = useRouter();
   const [scholars, setScholars] = useState<any[]>([]);
-  const [schools, setSchools] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'matriculation' | 'exams' | 'drc-presentation' | 'src-presentation'>('profile');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [supervisors, setSupervisors] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
 
-  const initialForm = {
-    id: '',
-    scholarId: '',
-    enrollmentNumber: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    country: '',
-    dateOfBirth: '',
-    gender: '',
-    address: '',
-    schoolId: '',
-    departmentId: '',
-    program: '',
-    status: 'ACTIVE',
-    supervisorId: '',
-    courseIds: [] as string[]
-  };
-  const [formData, setFormData] = useState(initialForm);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [sorting, setSorting] = useState<SortingState>([]);
 
+  const setHeader = useLayoutStore((state) => state.setHeader);
+  const resetHeader = useLayoutStore((state) => state.resetHeader);
   const [currentUser, setCurrentUser] = useState<any>(null);
-
-  
-  const fetchSupervisors = async () => {
-    try {
-      const res = await fetch(`/api/supervisors`);
-      const data = await res.json();
-      if (data.supervisors) setSupervisors(data.supervisors);
-    } catch(e) {}
-  };
-
-  useEffect(() => {
-    fetchSupervisors();
-  }, []);
   
   const fetchData = async () => {
     try {
-      const [scholarsRes, schoolsRes, deptsRes, authRes, coursesRes] = await Promise.all([
+      const [scholarsRes, authRes] = await Promise.all([
         fetch('/api/scholars?t=' + Date.now(), { cache: 'no-store' }),
-        fetch('/api/schools'),
-        fetch('/api/departments'),
         fetch('/api/auth/me'),
-        fetch('/api/courses')
       ]);
       
-      if (scholarsRes.ok && schoolsRes.ok && deptsRes.ok && authRes.ok && coursesRes.ok) {
+      if (scholarsRes.ok && authRes.ok) {
         const scholarsData = await scholarsRes.json();
-        const schoolsData = await schoolsRes.json();
-        const deptsData = await deptsRes.json();
         const authData = await authRes.json();
-        const coursesData = await coursesRes.json();
         
         setScholars(scholarsData.scholars || []);
-        setSchools(schoolsData.schools || []);
-        setDepartments(deptsData.departments || []);
         setCurrentUser(authData);
-        setCourses(coursesData.courses || []);
       }
     } catch (e) {
       toast.error('Failed to load data');
@@ -94,52 +56,28 @@ export default function ScholarsPage() {
     fetchData();
   }, []);
 
-  const openAddModal = () => {
-    let presetSchoolId = '';
-    if (currentUser?.rawRole === 'COORDINATOR' && currentUser?.schoolId) {
-      presetSchoolId = currentUser.schoolId;
-    }
-    setFormData({ ...initialForm, schoolId: presetSchoolId });
-    setIsModalOpen(true); setActiveTab('profile');
-  };
+  const openAddModal = useCallback(() => {
+    router.push('/scholars/new');
+  }, [router]);
 
-  const openEditModal = async (scholar: any) => {
-    try {
-      const toastId = toast.loading('Loading scholar details...');
-      const res = await fetch(`/api/scholars/${scholar.id}`);
-      const data = await res.json();
-      toast.dismiss(toastId);
-      
-      if (res.ok && data.scholar) {
-        const fullScholar = data.scholar;
-        setFormData({
-          id: fullScholar.id,
-          scholarId: fullScholar.scholarId,
-          enrollmentNumber: fullScholar.enrollmentNumber,
-          firstName: fullScholar.firstName,
-          lastName: fullScholar.lastName,
-          email: fullScholar.email,
-          phone: fullScholar.phone || '',
-          country: fullScholar.country || '',
-          dateOfBirth: fullScholar.dateOfBirth ? new Date(fullScholar.dateOfBirth).toISOString().split('T')[0] : '',
-          gender: fullScholar.gender || '',
-          address: fullScholar.address || '',
-          schoolId: fullScholar.schoolId,
-          departmentId: fullScholar.departmentId,
-          program: fullScholar.program || '',
-          status: fullScholar.status,
-          supervisorId: fullScholar.supervisor?.supervisorId ? String(fullScholar.supervisor.supervisorId) : '',
-          courseIds: fullScholar.courses?.map((c: any) => String(c.courseId)) || []
-        });
-        setIsEditModalOpen(true); 
-        setActiveTab('profile');
-      } else {
-        toast.error('Failed to load scholar details');
-      }
-    } catch (e) {
-      toast.error('Failed to load scholar details');
-    }
-  };
+  useEffect(() => {
+    const showAddButton = ['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole);
+    setHeader(
+      "Ph.D. Scholars",
+      "Manage Ph.D. scholars across all university programs.",
+      showAddButton ? (
+        <button 
+          onClick={openAddModal}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[5px] bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
+        >
+          <Plus className="w-4 h-4" />
+          Add Scholar
+        </button>
+      ) : undefined
+    );
+    return () => resetHeader();
+  }, [setHeader, resetHeader, currentUser?.rawRole, openAddModal]);
+
   const confirmDelete = (id: string) => {
     setDeletingId(id);
     setIsDeleteModalOpen(true);
@@ -160,588 +98,265 @@ export default function ScholarsPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole)) {
-      toast.error('You do not have permission to edit scholar profiles.');
-      return;
-    }
-    if (!formData.scholarId || !formData.enrollmentNumber || !formData.firstName || !formData.lastName || !formData.email || !formData.schoolId || !formData.departmentId) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const isEdit = isEditModalOpen;
-      const url = isEdit ? `/api/scholars/${formData.id}` : '/api/scholars';
-      const method = isEdit ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        toast.error(data.error || 'Failed to save scholar');
-      } else {
-        toast.success(isEdit ? 'Scholar updated successfully!' : 'Scholar added successfully!');
-        fetchData();
-        if (!isEdit && data.scholar?.id) {
-          setFormData(prev => ({ ...prev, id: data.scholar.id }));
-          setIsModalOpen(false);
-          setIsEditModalOpen(true);
-          setActiveTab('matriculation');
-        } else {
-          setIsModalOpen(false);
-          setIsEditModalOpen(false);
-        }
+  const columns = useMemo<ColumnDef<any>[]>(
+    () => [
+      {
+        accessorFn: (row) => row.scholarId,
+        id: 'id_enrollment',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Scholar ID
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => {
+          const scholar = row.original;
+          return (
+            <div>
+              <p className="inline-flex items-center px-2.5 py-1 rounded-[5px] bg-primary-light text-primary font-bold text-xs mb-1">
+                {scholar.scholarId}
+              </p>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => `${row.firstName} ${row.lastName}`,
+        id: 'name',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Name
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => {
+          const scholar = row.original;
+          return (
+            <div>
+              <p className="text-sm font-medium text-foreground">{scholar.firstName} {scholar.lastName}</p>
+            </div>
+          );
+        },
+      },
+      {
+        accessorFn: (row) => row.createdAt,
+        id: 'joinedDate',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Joined Date
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => (
+          <span className="text-sm font-medium text-foreground">
+            {new Date(row.original.createdAt).toLocaleDateString()}
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => row.status,
+        id: 'status',
+        header: () => <span className="uppercase flex justify-center">Status</span>,
+        cell: ({ row }) => {
+          const status = row.original.status;
+          return (
+            <div className="flex justify-center">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-[5px] text-xs font-medium ${
+                status === 'ACTIVE' ? 'bg-success-light text-success' : 
+                status === 'GRADUATED' ? 'bg-primary-light text-primary' : 'bg-warning-light text-warning'
+              }`}>
+                {status}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: () => <span className="uppercase flex justify-end">Actions</span>,
+        cell: ({ row }) => {
+          const scholar = row.original;
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <button 
+                onClick={(e) => { e.stopPropagation(); router.push('/scholars/' + scholar.id); }}
+                className="p-2 text-muted hover:text-primary transition-colors rounded-[5px] hover:bg-primary-light"
+                title="View Details"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); router.push('/scholars/' + scholar.id); }}
+                className="p-2 text-muted hover:text-primary transition-colors rounded-[5px] hover:bg-primary-light"
+                title="Edit Details"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); confirmDelete(scholar.id); }}
+                  className="p-2 text-muted hover:text-danger transition-colors rounded-[5px] hover:bg-danger-light"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          );
+        },
       }
-    } catch (e) {
-      toast.error('An error occurred');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    ],
+    [currentUser, router, confirmDelete]
+  );
+
+  const table = useReactTable({
+    data: scholars,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onGlobalFilterChange: setGlobalFilter,
+  });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Ph.D. Scholars</h1>
-          <p className="text-sm text-muted mt-1">Manage Ph.D. scholars across all university programs.</p>
+      {/* Header handled by useLayoutStore */}
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-2">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input
+            type="text"
+            placeholder="Search scholars..."
+            value={globalFilter ?? ''}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-[5px] border border-border bg-surface text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
         </div>
-        {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
-          <button 
-            onClick={openAddModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
-          >
-            <Plus className="w-4 h-4" />
-            Add Scholar
-          </button>
-        )}
       </div>
 
       {/* Data Table */}
-      <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full">
             <thead>
-              <tr className="bg-background border-b border-border text-left">
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">ID & Enrollment</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Name</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Program / Dept</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Joined Date</th>
-                <th className="py-4 px-6 text-center text-xs font-semibold text-muted uppercase tracking-wider">Verification</th>
-                <th className="py-4 px-6 text-center text-xs font-semibold text-muted uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-right text-xs font-semibold text-muted uppercase tracking-wider">Actions</th>
-              </tr>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-border bg-background/50 text-left">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="text-left text-xs font-semibold text-muted tracking-wider px-5 py-3.5">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted">Loading scholars...</td>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    Loading scholars...
+                  </td>
                 </tr>
-              ) : scholars.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted">No scholars found</td>
-                </tr>
-              ) : (
-                scholars.map((scholar) => (
-                  <tr 
-                    key={scholar.id} 
-                    onClick={() => openEditModal(scholar)}
-                    className="hover:bg-surface-hover transition-colors cursor-pointer"
-                  >
-                    <td className="py-4 px-6">
-                      <p className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-light text-primary font-bold text-xs mb-1">
-                        {scholar.scholarId}
-                      </p>
-                      <p className="text-xs text-muted font-mono">{scholar.enrollmentNumber}</p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-sm font-medium text-foreground">{scholar.firstName} {scholar.lastName}</p>
-                      <p className="text-xs text-muted mt-0.5">{scholar.school?.schoolName || 'University'}</p>
-                    </td>
-                    <td className="py-4 px-6 text-sm text-muted">
-                      {scholar.program || scholar.department?.departmentName || 'N/A'}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-foreground">
-                      {new Date(scholar.createdAt).toLocaleDateString()}
-                    </td>
-                    
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
-                          scholar.verificationStatus === 'COMPLETE' ? 'bg-success-light text-success border-success/20' : 
-                          scholar.verificationStatus === 'PENDING' ? 'bg-warning-light text-warning border-warning/20' : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`} title="Matriculation Verification">
-                          MATRIC: {scholar.verificationStatus || 'DRAFT'}
-                        </span>
-                        
-                        {scholar.supervisor && (
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
-                            scholar.supervisor.status === 'VERIFIED_RDC' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                            scholar.supervisor.status === 'VERIFIED_BOTH' ? 'bg-purple-50 text-purple-600 border-purple-200' : 
-                            scholar.supervisor.status === 'VERIFIED_DEAN' ? 'bg-blue-50 text-blue-600 border-blue-200' : 
-                            scholar.supervisor.status === 'VERIFIED_HOD' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                          }`} title="Assignment Verification">
-                            ASSGN: {scholar.supervisor.status === 'VERIFIED_RDC' ? 'VERIFIED RDC' : scholar.supervisor.status === 'VERIFIED_BOTH' ? 'VERIFIED HOD & DEAN' : scholar.supervisor.status || 'UNASSIGNED'}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-center">
-
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        scholar.status === 'ACTIVE' ? 'bg-success-light text-success' : 
-                        scholar.status === 'GRADUATED' ? 'bg-primary-light text-primary' : 'bg-warning-light text-warning'
-                      }`}>
-                        {scholar.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); openEditModal(scholar); }}
-                          className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); confirmDelete(scholar.id); }}
-                            className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <Fragment key={row.id}>
+                    <tr 
+                      onClick={() => router.push('/scholars/' + row.original.id)}
+                      className="hover:bg-slate-50/50 cursor-pointer transition-colors group"
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-5 py-3 border-b-0 pt-4">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr 
+                      onClick={() => router.push('/scholars/' + row.original.id)}
+                      className="border-b border-border-light cursor-pointer hover:bg-slate-50/50 group"
+                    >
+                      <td colSpan={columns.length} className="px-5 pb-4 pt-1">
+                        <div className="bg-slate-50/50 border border-slate-100 rounded-[5px] px-3 py-1.5 text-xs text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-2 group-hover:bg-slate-50 group-hover:text-slate-600 transition-all duration-200">
+                          <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> EN. No: <span className="font-medium">{row.original.enrollmentNumber || 'N/A'}</span></span>
+                          <span className="hidden sm:inline text-slate-200 group-hover:text-slate-300 transition-colors">|</span>
+                          <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" /> <span className="font-medium">{row.original.school?.schoolName || 'N/A'}</span></span>
+                          <span className="hidden sm:inline text-slate-200 group-hover:text-slate-300 transition-colors">|</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> <span className="font-medium">{row.original.program || row.original.department?.departmentName || 'N/A'}</span></span>
+                          <span className="hidden sm:inline text-slate-200 group-hover:text-slate-300 transition-colors">|</span>
+                          <span className="flex items-center gap-1"><FileCheck className="w-3.5 h-3.5" /> Matriculation: <span className="font-medium">{row.original.verificationStatus === 'COMPLETE' ? 'Complete' : row.original.verificationStatus === 'PENDING' ? 'Pending' : 'Draft'}</span></span>
+                          {row.original.supervisor && (
+                            <>
+                              <span className="hidden sm:inline text-slate-200 group-hover:text-slate-300 transition-colors">|</span>
+                              <span className="flex items-center gap-1"><UserCog className="w-3.5 h-3.5" /> Assignment: <span className="font-medium">{row.original.supervisor.status === 'VERIFIED_RDC' ? 'Verified RDC' : row.original.supervisor.status === 'VERIFIED_BOTH' ? 'Verified HOD & Dean' : row.original.supervisor.status === 'VERIFIED_DEAN' ? 'Verified Dean' : row.original.supervisor.status === 'VERIFIED_HOD' ? 'Verified HOD' : 'Unassigned'}</span></span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    No scholars found.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Add/Edit Scholar Modal */}
-      {(isModalOpen || isEditModalOpen) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-surface w-full max-w-6xl max-h-[95vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-white shadow-sm shrink-0 relative z-10 gap-4">
-              <div className="flex items-center shrink-0">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <GraduationCap className="w-5 h-5 text-primary" />
-                  </div>
-                  {isEditModalOpen ? (['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) ? 'Edit Scholar' : 'View Scholar') : 'New Scholar'}
-                </h3>
-              </div>
-              
-              <div className="flex-1 min-w-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex justify-start lg:justify-center">
-                <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
-                  <button
-                    type="button"
-                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'profile' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
-                    onClick={() => setActiveTab('profile')}
-                  >
-                    <User className="w-4 h-4" />
-                    Profile Details
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!formData.id}
-                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'matriculation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    onClick={() => formData.id && setActiveTab('matriculation')}
-                    title={!formData.id ? "Please create the scholar first to manage matriculation" : ""}
-                  >
-                    <FileCheck className="w-4 h-4" />
-                    Matriculation Checklist
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!formData.id}
-                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'exams' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    onClick={() => formData.id && setActiveTab('exams')}
-                    title={!formData.id ? "Please create the scholar first to manage exams" : ""}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    Exams
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!formData.id}
-                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'drc-presentation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    onClick={() => formData.id && setActiveTab('drc-presentation')}
-                    title={!formData.id ? "Please create the scholar first to manage presentations" : ""}
-                  >
-                    <MonitorPlay className="w-4 h-4" />
-                    DRC Presentation
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!formData.id}
-                    className={`py-1.5 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap focus:outline-none transition-all duration-200 ${activeTab === 'src-presentation' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'} ${!formData.id ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    onClick={() => formData.id && setActiveTab('src-presentation')}
-                    title={!formData.id ? "Please create the scholar first to manage presentations" : ""}
-                  >
-                    <MonitorPlay className="w-4 h-4" />
-                    SRC Presentation
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end shrink-0 pl-2">
-                <button 
-                  onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }}
-                  className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
-                >
-                  <X className="w-4 h-4 stroke-[2.5]" />
-                </button>
-              </div>
-            </div>
-
-            {activeTab === 'profile' ? (
-            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto">
-              <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* Academic Identity */}
-                <div className="space-y-4 md:col-span-2">
-                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider border-b border-border pb-2">Academic Identity</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Scholar ID *</label>
-                      <input required type="text" value={formData.scholarId} onChange={(e) => setFormData({ ...formData, scholarId: e.target.value })} placeholder="e.g. STU1004" className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Enrollment Number *</label>
-                      <input required type="text" value={formData.enrollmentNumber} onChange={(e) => setFormData({ ...formData, enrollmentNumber: e.target.value })} placeholder="e.g. ENR-2026-001" className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Personal Information */}
-                <div className="space-y-4 md:col-span-2">
-                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider border-b border-border pb-2 mt-2">Personal Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">First Name *</label>
-                      <input required type="text" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="First Name" className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Last Name *</label>
-                      <input required type="text" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="Last Name" className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Email *</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                        <input required type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="scholar@domain.edu" className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                        <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+91 98765 43210" className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Country</label>
-                      <select value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm">
-                        <option value="">Select Country</option>
-                        <option value="India">India</option>
-                        <option value="United States">United States</option>
-                        <option value="Canada">Canada</option>
-                        <option value="United Kingdom">United Kingdom</option>
-                        <option value="Australia">Australia</option>
-                        <option value="New Zealand">New Zealand</option>
-                        <option value="United Arab Emirates">United Arab Emirates</option>
-                        <option value="Saudi Arabia">Saudi Arabia</option>
-                        <option value="Singapore">Singapore</option>
-                        <option value="Malaysia">Malaysia</option>
-                        <option value="Germany">Germany</option>
-                        <option value="France">France</option>
-                        <option value="Italy">Italy</option>
-                        <option value="Spain">Spain</option>
-                        <option value="Netherlands">Netherlands</option>
-                        <option value="Belgium">Belgium</option>
-                        <option value="Switzerland">Switzerland</option>
-                        <option value="Austria">Austria</option>
-                        <option value="Sweden">Sweden</option>
-                        <option value="Norway">Norway</option>
-                        <option value="Denmark">Denmark</option>
-                        <option value="Finland">Finland</option>
-                        <option value="Portugal">Portugal</option>
-                        <option value="Poland">Poland</option>
-                        <option value="Russia">Russia</option>
-                        <option value="Turkey">Turkey</option>
-                        <option value="China">China</option>
-                        <option value="Japan">Japan</option>
-                        <option value="South Korea">South Korea</option>
-                        <option value="Pakistan">Pakistan</option>
-                        <option value="Bangladesh">Bangladesh</option>
-                        <option value="Sri Lanka">Sri Lanka</option>
-                        <option value="Nepal">Nepal</option>
-                        <option value="Indonesia">Indonesia</option>
-                        <option value="Philippines">Philippines</option>
-                        <option value="Thailand">Thailand</option>
-                        <option value="Vietnam">Vietnam</option>
-                        <option value="Brazil">Brazil</option>
-                        <option value="Mexico">Mexico</option>
-                        <option value="Argentina">Argentina</option>
-                        <option value="South Africa">South Africa</option>
-                        <option value="Nigeria">Nigeria</option>
-                        <option value="Kenya">Kenya</option>
-                        <option value="Egypt">Egypt</option>
-                        <option value="Iran">Iran</option>
-                        <option value="Iraq">Iraq</option>
-                        <option value="Jordan">Jordan</option>
-                        <option value="Lebanon">Lebanon</option>
-                        <option value="Israel">Israel</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Gender</label>
-                      <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm">
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Date of Birth</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-                        <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Academic Placement */}
-                <div className="space-y-4 md:col-span-2">
-                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider border-b border-border pb-2 mt-2">Academic Placement</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">School *</label>
-                      <select 
-                        required 
-                        value={formData.schoolId} 
-                        onChange={(e) => setFormData({ ...formData, schoolId: e.target.value })} 
-                        disabled={currentUser?.rawRole === 'COORDINATOR'}
-                        className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Select School</option>
-                        {schools.map(s => <option key={s.id} value={s.id}>{s.schoolName}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Department *</label>
-                      <select required value={formData.departmentId} onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm">
-                        <option value="">Select Department</option>
-                        {departments.filter(d => !formData.schoolId || d.schoolId === formData.schoolId).map(d => (
-                          <option key={d.id} value={d.id}>{d.departmentName}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Program Name</label>
-                      <input type="text" value={formData.program} onChange={(e) => setFormData({ ...formData, program: e.target.value })} placeholder="e.g. Ph.D. in AI" className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Status</label>
-                      <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm">
-                        <option value="ACTIVE">Active</option>
-                        <option value="INACTIVE">Inactive</option>
-                        <option value="GRADUATED">Graduated</option>
-                        <option value="SUSPENDED">Suspended</option>
-                      </select>
-                    </div>
-
-                    {/* Supervisor Assignment */}
-                    {(() => {
-                      const currentScholar = scholars.find((s: any) => s.id === formData.id);
-                      const dept = departments.find(d => d.id === formData.departmentId);
-                      const hasHod = dept?._count?.users > 0;
-
-                      const hodVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'HOD');
-                      const deanVerified = currentScholar?.verifications?.find((v: any) => v.stage === 'DEAN');
-                      const isVerified = deanVerified && (!hasHod || hodVerified);
-
-                      const isCoordinator = currentUser?.rawRole === 'COORDINATOR';
-                      const isRdcMember = ['SUPER_ADMIN', 'ADMIN', 'VC', 'RDC_ADMIN'].includes(currentUser?.rawRole);
-                      
-                      if (!isCoordinator && !isRdcMember) {
-                        return null;
-                      }
-
-                      if (!isCoordinator) {
-                        const currentCourseId = formData.courseIds?.[0];
-                        const currentCourse = courses.find(c => c.id === currentCourseId);
-                        const currentSupervisor = supervisors.find(s => s.id === formData.supervisorId);
-                        
-                        const handleVerifyAssignment = async (stage: string) => {
-                          try {
-                            const res = await fetch(`/api/scholars/${formData.id}/assignments/verify`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ stage })
-                            });
-                            if (res.ok) {
-                              toast.success(`Assignments verified!`);
-                              fetchData();
-                            } else {
-                              toast.error(`Verification failed`);
-                            }
-                          } catch(e) {}
-                        };
-
-                        const currentStatus = currentScholar?.supervisor?.status;
-                        const canVerifyRdc = isRdcMember && currentStatus !== 'VERIFIED_RDC';
-
-                        const stageName = 'RDC';
-
-                        let displayStatus = currentStatus || 'UNASSIGNED';
-                        if (currentStatus === 'VERIFIED_RDC') displayStatus = 'VERIFIED RDC';
-
-                        return (
-                          <div className="md:col-span-2 mt-4 space-y-4">
-                            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <h4 className="text-sm font-bold text-slate-800">Course & Supervisor Assignment</h4>
-                                  <p className="text-xs text-slate-500 mt-1">Review the assignments made by the Coordinator. Status: <span className="font-semibold text-blue-600">{displayStatus}</span></p>
-                                </div>
-                                {canVerifyRdc && (formData.supervisorId || (formData.courseIds && formData.courseIds.length > 0)) && (
-                                  <button 
-                                    type="button"
-                                    onClick={() => handleVerifyAssignment(stageName)}
-                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                                  >
-                                    Verify as {stageName}
-                                  </button>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-500 mb-1">Assigned Course</label>
-                                  <div className="text-sm font-medium text-slate-800">
-                                    {currentCourse ? `${currentCourse.courseCode} - ${currentCourse.courseName}` : 'No course assigned yet'}
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-500 mb-1">Assigned Supervisor</label>
-                                  <div className="text-sm font-medium text-slate-800">
-                                    {currentSupervisor ? `${currentSupervisor.name} (${currentSupervisor.email})` : 'No supervisor assigned yet'}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      
-                      return (
-                        <div className="md:col-span-2 mt-4 space-y-4">
-                        <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
-                          <h4 className="text-sm font-bold text-slate-800 mb-3">Course Assignment</h4>
-                          <div className="relative">
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Assign Course</label>
-                            <select 
-                              value={formData.courseIds?.[0] || ''} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setFormData({ ...formData, courseIds: val ? [val] : [] });
-                              }}
-                              disabled={!isVerified}
-                              className={`w-full px-4 py-2 rounded-lg border ${!isVerified ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-blue-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20'} text-sm`}
-                            >
-                              <option value="">-- Select Course --</option>
-                              {courses
-                                .filter(c => c.departmentId === formData.departmentId)
-                                .map(c => <option key={c.id} value={c.id}>{c.courseCode} - {c.courseName}</option>)}
-                            </select>
-                            {!isVerified && (
-                              <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
-                                Assignment locked: Requires {hasHod ? 'both HOD and Dean' : 'Dean'} verification first.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
-                          <h4 className="text-sm font-bold text-slate-800 mb-3">Supervisor Assignment</h4>
-                          <div className="relative">
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Assign Supervisor</label>
-                            <select 
-                              value={formData.supervisorId || ''} 
-                              onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })} 
-                              disabled={!isVerified}
-                              className={`w-full px-4 py-2 rounded-lg border ${!isVerified ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-blue-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20'} text-sm`}
-                            >
-                              <option value="">-- Select Supervisor --</option>
-                              {supervisors
-                                .filter(s => !formData.departmentId || s.departmentId === formData.departmentId)
-                                .map(s => <option key={s.id} value={s.id}>{s.name} ({s.email})</option>)}
-                            </select>
-                            {!isVerified && (
-                              <p className="text-xs text-orange-600 mt-2 font-medium flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
-                                Assignment locked: Requires {hasHod ? 'both HOD and Dean' : 'Dean'} verification first.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        </div>
-                      );
-                    })()}
-
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-              <div className="px-6 py-4 border-t border-border bg-background/50 flex gap-3 justify-end shrink-0">
-                <button
-                  type="button"
-                  onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }}
-                  className="px-6 py-2.5 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
-                >
-                  {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) ? 'Cancel' : 'Close'}
-                </button>
-                {['SUPER_ADMIN', 'RDC_ADMIN', 'COORDINATOR'].includes(currentUser?.rawRole) && (
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-2.5 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
-                  >
-                    {submitting ? 'Saving...' : (isEditModalOpen ? 'Save Changes' : 'Create Scholar')}
-                  </button>
-                )}
-              </div>
-            </form>
-            ) : activeTab === 'matriculation' ? (
-              <div className="flex-1 overflow-y-auto"><MatriculationView scholarId={formData.id} /></div>
-            ) : activeTab === 'exams' ? (
-              <div className="flex-1 overflow-y-auto"><ExamsView scholarId={formData.id} currentUser={currentUser} /></div>
-            ) : activeTab === 'drc-presentation' ? (
-              <div className="flex-1 overflow-y-auto"><PresentationView scholarId={formData.id!} currentUser={currentUser} type="DRC" /></div>
-            ) : activeTab === 'src-presentation' ? (
-              <div className="flex-1 overflow-y-auto"><PresentationView scholarId={formData.id!} currentUser={currentUser} type="SRC" /></div>
-            ) : null}
+        
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border bg-background/30">
+          <div className="text-sm text-muted">
+            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            {table.getPageCount() || 1}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="p-2 rounded-[5px] border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="p-2 rounded-[5px] border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      )}
+      </div>
+
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -759,14 +374,14 @@ export default function ScholarsPage() {
               <button
                 type="button"
                 onClick={() => { setIsDeleteModalOpen(false); setDeletingId(null); }}
-                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-red-600 rounded-lg shadow-sm hover:shadow transition-all"
+                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-red-600 rounded-[5px] shadow-sm hover:shadow transition-all"
               >
                 Yes, Delete
               </button>
@@ -774,9 +389,6 @@ export default function ScholarsPage() {
           </div>
         </div>
       )}
-
-      
     </div>
   );
 }
-

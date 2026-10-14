@@ -378,53 +378,41 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
         <input type="file" ref={undertakingInputRef} onChange={(e) => handleFileUpload(e, true)} accept=".pdf,.jpg,.jpeg,.png" />
       </div>
 
-      <div className="w-full mx-auto py-4 px-2 space-y-6 print-section">
+      <div className="flex flex-col h-full print-section">
         
-        {/* Header Actions (No Print) */}
-        <div className="flex items-center justify-between no-print mb-6">
+        <div className="p-6 md:p-8 space-y-8 flex-1">
           
-          <div className="flex items-center gap-3">
-
-
-          </div>
-        </div>
-
-        <div className="bg-white text-black p-8 md:p-12 shadow-sm rounded-xl border border-gray-200">
-          
-
-
           {/* Scholar Info */}
-          <div className="mb-8 relative">
-            <div className="flex items-center justify-between bg-gray-100 p-2 mb-4 border border-gray-300">
-              <h4 className="text-sm font-bold uppercase">Ph.D. Scholar Information</h4>
-              
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+              <h4 className="text-xs font-bold text-muted uppercase tracking-wider">Ph.D. Scholar Information</h4>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm">
-              <div className="flex border-b border-gray-200 pb-2">
-                <span className="font-bold w-40">Scholar Name:</span>
-                <span className="flex-1">{scholar.firstName} {scholar.lastName}</span>
+              <div className="flex border-b border-border pb-2">
+                <span className="font-bold w-40 text-muted">Scholar Name:</span>
+                <span className="flex-1 font-medium text-foreground">{scholar.firstName} {scholar.lastName}</span>
               </div>
-              <div className="flex border-b border-gray-200 pb-2">
-                <span className="font-bold w-40">System ID:</span>
-                <span className="flex-1 font-mono">{scholar.scholarId}</span>
+              <div className="flex border-b border-border pb-2">
+                <span className="font-bold w-40 text-muted">System ID:</span>
+                <span className="flex-1 font-mono text-foreground">{scholar.scholarId}</span>
               </div>
-              <div className="flex border-b border-gray-200 pb-2">
-                <span className="font-bold w-40">School:</span>
-                <span className="flex-1">{scholar.school?.schoolName}</span>
+              <div className="flex border-b border-border pb-2">
+                <span className="font-bold w-40 text-muted">School:</span>
+                <span className="flex-1 text-foreground">{scholar.school?.schoolName}</span>
               </div>
-              <div className="flex border-b border-gray-200 pb-2">
-                <span className="font-bold w-40">Department:</span>
-                <span className="flex-1">{scholar.department?.departmentName}</span>
+              <div className="flex border-b border-border pb-2">
+                <span className="font-bold w-40 text-muted">Department:</span>
+                <span className="flex-1 text-foreground">{scholar.department?.departmentName}</span>
               </div>
-              <div className="flex border-b border-gray-200 pb-2 md:col-span-2">
-                <span className="font-bold w-40 shrink-0">Mode:</span>
-                <div className="flex gap-6 flex-1">
+              <div className="flex border-b border-border pb-2 md:col-span-2">
+                <span className="font-bold w-40 shrink-0 text-muted">Mode:</span>
+                <div className="flex gap-6 flex-1 text-foreground">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={matriculation.mode === "FULL_TIME"} onChange={(e) => handleModeChange("FULL_TIME")}  className="accent-black w-4 h-4" /> 
+                    <input type="radio" checked={matriculation.mode === "FULL_TIME"} onChange={(e) => handleModeChange("FULL_TIME")}  className="accent-primary w-4 h-4" /> 
                     Full Time
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={matriculation.mode === "PART_TIME"} onChange={(e) => handleModeChange("PART_TIME")}  className="accent-black w-4 h-4" /> 
+                    <input type="radio" checked={matriculation.mode === "PART_TIME"} onChange={(e) => handleModeChange("PART_TIME")}  className="accent-primary w-4 h-4" /> 
                     Part Time
                   </label>
                 </div>
@@ -435,59 +423,60 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
 
 
           {/* Verification Status */}
-          <div className="mb-8">
-            <h4 className="text-sm font-bold uppercase bg-gray-100 p-2 mb-4 border border-gray-300 flex justify-between items-center">
-              <span>Document Verification Status</span>
-              <span className="text-xs font-normal bg-white px-2 py-0.5 rounded border border-gray-300">Progress: {progressPercent}%</span>
-            </h4>
+          <div>
+            <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+              <h4 className="text-xs font-bold text-muted uppercase tracking-wider">Document Verification Status</h4>
+              <span className="text-[10px] font-bold text-muted bg-surface-hover px-2 py-0.5 rounded-[5px] border border-border uppercase tracking-wider">Progress: {progressPercent}%</span>
+            </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-4">
-              <div className="p-3 border border-gray-200 rounded-lg bg-indigo-50">
-                <div className="text-2xl font-bold text-indigo-700">{submitted}</div>
-                <div className="text-xs text-indigo-600 uppercase mt-1">Submitted</div>
+              <div className="p-4 border border-border rounded-[5px] bg-primary-light/30">
+                <div className="text-2xl font-bold text-primary">{submitted}</div>
+                <div className="text-[10px] font-bold text-primary uppercase tracking-wider mt-1">Submitted</div>
               </div>
-              <div className="p-3 border border-gray-200 rounded-lg bg-green-50">
-                <div className="text-2xl font-bold text-green-700">{verified}</div>
-                <div className="text-xs text-green-600 uppercase mt-1">Verified</div>
+              <div className="p-4 border border-border rounded-[5px] bg-success-light/30">
+                <div className="text-2xl font-bold text-success">{verified}</div>
+                <div className="text-[10px] font-bold text-success uppercase tracking-wider mt-1">Verified</div>
               </div>
-              <div className="p-3 border border-gray-200 rounded-lg bg-orange-50">
-                <div className="text-2xl font-bold text-orange-700">{pending}</div>
-                <div className="text-xs text-orange-600 uppercase mt-1">Pending</div>
+              <div className="p-4 border border-border rounded-[5px] bg-warning-light/30">
+                <div className="text-2xl font-bold text-warning">{pending}</div>
+                <div className="text-[10px] font-bold text-warning uppercase tracking-wider mt-1">Pending</div>
               </div>
-              <div className="p-3 border border-gray-200 rounded-lg bg-red-50">
-                <div className="text-2xl font-bold text-red-700">{rejected}</div>
-                <div className="text-xs text-red-600 uppercase mt-1">Rejected</div>
+              <div className="p-4 border border-border rounded-[5px] bg-danger-light/30">
+                <div className="text-2xl font-bold text-danger">{rejected}</div>
+                <div className="text-[10px] font-bold text-danger uppercase tracking-wider mt-1">Rejected</div>
               </div>
             </div>
             
-            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-              <div className="bg-green-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+            <div className="w-full bg-surface-hover rounded-full h-1.5 overflow-hidden border border-border-light">
+              <div className="bg-success h-1.5 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
             </div>
           </div>
 
           {/* Checklist Table */}
-          <div className="mb-8 overflow-x-auto">
-            <h4 className="text-sm font-bold uppercase bg-gray-100 p-2 border border-gray-300 border-b-0">Document Verification Checklist</h4>
-            <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-300 p-2 w-12 text-center">S.No.</th>
-                  <th className="border border-gray-300 p-2 text-left">Document / Requirement</th>
-                  <th className="border border-gray-300 p-2 w-48 text-center no-print">Document</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="overflow-x-auto">
+            <h4 className="text-xs font-bold text-muted uppercase tracking-wider border-b border-border pb-2 mb-4">Document Verification Checklist</h4>
+            <div className="border border-border rounded-[5px] overflow-hidden bg-surface">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-surface-hover border-b border-border">
+                    <th className="p-3 w-12 text-center text-xs font-bold text-muted uppercase tracking-wider">S.No.</th>
+                    <th className="p-3 text-left text-xs font-bold text-muted uppercase tracking-wider">Document / Requirement</th>
+                    <th className="p-3 w-48 text-center no-print text-xs font-bold text-muted uppercase tracking-wider">Document</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
                 {matriculation.documents.map((doc: any, idx: number) => {
                   const isNA = doc.documentNo === 13 && matriculation.mode === "FULL_TIME";
                   
                   return (
-                    <tr key={doc.documentNo} className={isNA ? "bg-gray-50/50" : ""}>
-                      <td className="border border-gray-300 p-2 text-center font-medium text-gray-600">{doc.documentNo}</td>
-                      <td className="border border-gray-300 p-2">
+                    <tr key={doc.documentNo} className={isNA ? "bg-background" : ""}>
+                      <td className="p-3 text-center font-medium text-muted">{doc.documentNo}</td>
+                      <td className="p-3 text-foreground">
                         {doc.documentName}
-                        {isNA && <span className="ml-2 text-xs font-bold text-red-500 no-print">(N/A)</span>}
+                        {isNA && <span className="ml-2 text-[10px] font-bold text-danger uppercase no-print">(N/A)</span>}
                       </td>
-                      <td className="border border-gray-300 p-2 text-center no-print">
+                      <td className="p-3 text-center no-print">
                         {isNA ? (
                           <span className="text-xs text-gray-400 italic">Not Applicable</span>
                         ) : !doc.filePath ? (
@@ -520,19 +509,20 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Undertaking Section */}
-          <div className="mb-8">
-             <h4 className="text-sm font-bold uppercase bg-gray-100 p-2 mb-4 border border-gray-300">Undertaking</h4>
-             <div className="p-4 border border-orange-200 bg-orange-50/50 rounded-lg flex flex-col md:flex-row items-center gap-4">
+          <div>
+             <h4 className="text-xs font-bold text-muted uppercase tracking-wider border-b border-border pb-2 mb-4">Undertaking</h4>
+             <div className="p-4 border border-warning/20 bg-warning-light/30 rounded-[5px] flex flex-col md:flex-row items-center gap-4">
                 <div className="flex-shrink-0">
-                  <AlertCircle className="w-8 h-8 text-orange-500" />
+                  <AlertCircle className="w-8 h-8 text-warning" />
                 </div>
-                <div className="flex-1 text-sm text-gray-700">
-                  <p><strong>Note:</strong> If any of the above-mentioned document has not been produced/submitted, the Ph.D Scholar has to furnish an undertaking for Matriculation.</p>
+                <div className="flex-1 text-sm text-foreground">
+                  <p><strong>Note:</strong> If any of the above-mentioned documents have not been produced/submitted, the Ph.D Scholar has to furnish an undertaking for Matriculation.</p>
                 </div>
                 <div className="flex-shrink-0 no-print">
                   {matriculation.undertaking ? (
@@ -562,26 +552,26 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
 
           
           {/* Official Verifications */}
-          <div className="mb-8 p-6 bg-white border border-gray-200 rounded-xl shadow-sm">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Official Verifications</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-4 rounded-lg border border-gray-100 bg-gray-50 flex flex-col items-center justify-center text-center">
-                <span className="text-xs font-semibold text-gray-500 uppercase mb-2">HOD Verification</span>
+          <div>
+            <h4 className="text-xs font-bold text-muted uppercase tracking-wider border-b border-border pb-2 mb-4">Official Verifications</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="p-6 rounded-[5px] border border-border bg-surface flex flex-col items-center justify-center text-center shadow-sm">
+                <span className="text-xs font-bold text-muted uppercase tracking-wider mb-4">HOD Verification</span>
                 {matriculation.verifications?.find((v: any) => v.stage === 'HOD') ? (
                   <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-                    <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
-                    <span className="text-sm font-bold text-green-700">Verified by HOD</span>
+                    <CheckCircle className="w-8 h-8 text-success mb-2" />
+                    <span className="text-sm font-bold text-success">Verified by HOD</span>
                   </div>
                 ) : (
                   currentUser?.rawRole === 'HOD' && scholar?.departmentId === currentUser.departmentId ? (
-                    <button onClick={() => setVerificationModal({isOpen: true, stage: 'HOD'})} className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-hover shadow-sm transition-colors">Verify as HOD</button>
+                    <button onClick={() => setVerificationModal({isOpen: true, stage: 'HOD'})} className="px-6 py-2 bg-primary text-white text-sm font-semibold rounded-[5px] hover:bg-primary-hover shadow-sm transition-colors">Verify as HOD</button>
                   ) : (
-                    <span className="text-sm text-gray-400 font-medium">Pending HOD Verification</span>
+                    <span className="text-sm text-muted font-medium bg-surface-hover px-4 py-2 rounded-[5px] border border-border">Pending HOD Verification</span>
                   )
                 )}
               </div>
-              <div className="p-4 rounded-lg border border-gray-100 bg-gray-50 flex flex-col items-center justify-center text-center">
-                <span className="text-xs font-semibold text-gray-500 uppercase mb-2">Dean Verification</span>
+              <div className="p-6 rounded-[5px] border border-border bg-surface flex flex-col items-center justify-center text-center shadow-sm">
+                <span className="text-xs font-bold text-muted uppercase tracking-wider mb-4">Dean Verification</span>
                 {matriculation.verifications?.find((v: any) => v.stage === 'DEAN') ? (
                   <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
                     <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
@@ -591,7 +581,7 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                   currentUser?.rawRole === 'DEAN' && scholar?.schoolId === currentUser.schoolId ? (
                     <button onClick={() => setVerificationModal({isOpen: true, stage: 'DEAN'})} className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-hover shadow-sm transition-colors">Verify as Dean</button>
                   ) : (
-                    <span className="text-sm text-gray-400 font-medium">Pending Dean Verification</span>
+                    <span className="text-sm text-muted font-medium bg-surface-hover px-4 py-2 rounded-[5px] border border-border">Pending Dean Verification</span>
                   )
                 )}
               </div>
@@ -599,8 +589,8 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
           </div>
 
           {/* Verification NB */}
-          <div className="mb-8 p-4 bg-gray-100 border border-gray-300 text-sm font-bold text-center">
-            <p className="uppercase text-red-600">NB:- Please bring all your documents in original for verification</p>
+          <div className="p-5 bg-background border border-border rounded-[5px] text-sm font-bold flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
+            <p className="text-[10px] uppercase font-bold text-danger tracking-wider">NB:- Please bring all your documents in original for verification</p>
             <div className="mt-3 flex items-center justify-center gap-2 text-black">
               <input 
                 type="checkbox" 
@@ -609,13 +599,12 @@ export default function MatriculationView({ scholarId }: { scholarId: string }) 
                 disabled={!canVerify}
                 className="w-5 h-5 accent-black cursor-pointer" 
               />
-              <span className="text-sm font-semibold">Original documents produced for verification</span>
+                <span className="text-sm font-semibold text-foreground">Original documents produced for verification</span>
             </div>
           </div>
 
         </div>
       </div>
-      
     
       {/* Verification Confirmation Modal */}
       {verificationModal.isOpen && (

@@ -1,12 +1,29 @@
 'use client';
 
-import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Plus, Search, Edit, Trash2, X, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLayoutStore } from '@/store/useLayoutStore';
 import toast from 'react-hot-toast';
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  ColumnDef,
+  SortingState,
+} from '@tanstack/react-table';
 
 export default function SchoolsPage() {
+  const setHeader = useLayoutStore((state) => state.setHeader);
+  const resetHeader = useLayoutStore((state) => state.resetHeader);
+
   const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [sorting, setSorting] = useState<SortingState>([]);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newSchool, setNewSchool] = useState({ schoolCode: '', schoolName: '', status: 'ACTIVE' });
@@ -32,6 +49,25 @@ export default function SchoolsPage() {
   useEffect(() => {
     fetchSchools();
   }, []);
+
+  const openAddModal = useCallback(() => {
+    setIsAddModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    setHeader(
+      "Schools Directory",
+      "Manage university schools and departments.",
+      <button 
+        onClick={openAddModal}
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[5px] bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
+      >
+        <Plus className="w-4 h-4" />
+        Add School
+      </button>
+    );
+    return () => resetHeader();
+  }, [setHeader, resetHeader, openAddModal]);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -118,91 +154,200 @@ export default function SchoolsPage() {
     }
   };
 
+  const columns = useMemo<ColumnDef<any>[]>(
+    () => [
+      {
+        accessorFn: (row) => row.schoolCode,
+        id: 'schoolCode',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              School Code
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-[5px] bg-primary-light text-primary font-bold text-xs">
+            {row.original.schoolCode}
+          </span>
+        ),
+      },
+      {
+        accessorFn: (row) => row.schoolName,
+        id: 'schoolName',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              School Name
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => (
+          <p className="text-sm font-medium text-foreground">{row.original.schoolName}</p>
+        ),
+      },
+      {
+        accessorFn: (row) => row._count?.departments || 0,
+        id: 'departments',
+        header: () => <span className="uppercase">Departments</span>,
+        cell: ({ row }) => (
+          <span className="text-sm font-medium text-foreground">{row.original._count?.departments || 0}</span>
+        ),
+      },
+      {
+        accessorFn: (row) => row._count?.scholars || 0,
+        id: 'scholars',
+        header: () => <span className="uppercase">Scholars</span>,
+        cell: ({ row }) => (
+          <span className="text-sm font-medium text-foreground">{row.original._count?.scholars || 0}</span>
+        ),
+      },
+      {
+        accessorFn: (row) => row.status,
+        id: 'status',
+        header: () => <span className="uppercase">Status</span>,
+        cell: ({ row }) => (
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-[5px] text-xs font-semibold ${
+            row.original.status === 'ACTIVE' ? 'bg-success-light text-success' : 'bg-warning-light text-warning'
+          }`}>
+            {row.original.status}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: () => <span className="uppercase flex justify-end">Actions</span>,
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-2">
+            <button 
+              onClick={() => openEditModal(row.original)}
+              className="p-2 text-muted hover:text-primary transition-colors rounded-[5px] hover:bg-primary-light"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => confirmDelete(row.original.id)}
+              className="p-2 text-muted hover:text-danger transition-colors rounded-[5px] hover:bg-danger-light"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ),
+      }
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: schools,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onGlobalFilterChange: setGlobalFilter,
+  });
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Schools Directory</h1>
-          <p className="text-sm text-muted mt-1">Manage university schools and departments.</p>
+      
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-2">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input
+            type="text"
+            placeholder="Search schools..."
+            value={globalFilter ?? ''}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-[5px] border border-border bg-surface text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200"
-        >
-          <Plus className="w-4 h-4" />
-          Add School
-        </button>
       </div>
 
       {/* Data Table */}
-      <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full">
             <thead>
-              <tr className="bg-background border-b border-border">
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">School Code</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">School Name</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Departments</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider">Scholars</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider text-center">Status</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted uppercase tracking-wider text-right">Actions</th>
-              </tr>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-border bg-background/50">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="text-left text-xs font-semibold text-muted tracking-wider px-5 py-3.5">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">Loading schools...</td>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    Loading schools...
+                  </td>
                 </tr>
-              ) : schools.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">No schools found</td>
-                </tr>
-              ) : (
-                schools.map((school) => (
-                  <tr key={school.id} className="hover:bg-surface-hover transition-colors">
-                    <td className="py-4 px-6">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-light text-primary font-bold text-xs">
-                        {school.schoolCode}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-sm font-medium text-foreground">{school.schoolName}</p>
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-foreground">
-                      {school._count?.departments || 0}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-foreground">
-                      {school._count?.scholars || 0}
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        school.status === 'ACTIVE' ? 'bg-success-light text-success' : 'bg-warning-light text-warning'
-                      }`}>
-                        {school.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => openEditModal(school)}
-                          className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => confirmDelete(school.id)}
-                          className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border-light last:border-b-0 hover:bg-background/60">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-5 py-4">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    No results.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border bg-background/30">
+          <div className="text-sm text-muted">
+            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            {table.getPageCount() || 1}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="p-2 rounded-[5px] border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="p-2 rounded-[5px] border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -214,7 +359,7 @@ export default function SchoolsPage() {
               <h3 className="text-lg font-semibold text-foreground">Add New School</h3>
               <button 
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-[5px] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -228,7 +373,7 @@ export default function SchoolsPage() {
                   value={newSchool.schoolCode}
                   onChange={(e) => setNewSchool({ ...newSchool, schoolCode: e.target.value })}
                   placeholder="e.g. SBT"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                   autoFocus
                 />
               </div>
@@ -240,7 +385,7 @@ export default function SchoolsPage() {
                   value={newSchool.schoolName}
                   onChange={(e) => setNewSchool({ ...newSchool, schoolName: e.target.value })}
                   placeholder="e.g. School of Business and Technology"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 />
               </div>
               
@@ -249,7 +394,7 @@ export default function SchoolsPage() {
                 <select
                   value={newSchool.status}
                   onChange={(e) => setNewSchool({ ...newSchool, status: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
@@ -260,14 +405,14 @@ export default function SchoolsPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-[5px] shadow-sm hover:shadow transition-all disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : 'Save School'}
                 </button>
@@ -285,7 +430,7 @@ export default function SchoolsPage() {
               <h3 className="text-lg font-semibold text-foreground">Edit School</h3>
               <button 
                 onClick={() => setIsEditModalOpen(false)}
-                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-foreground hover:bg-surface-hover rounded-[5px] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -299,8 +444,7 @@ export default function SchoolsPage() {
                   value={editingSchool.schoolCode}
                   onChange={(e) => setEditingSchool({ ...editingSchool, schoolCode: e.target.value })}
                   placeholder="e.g. SBT"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                  autoFocus
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 />
               </div>
               
@@ -311,7 +455,7 @@ export default function SchoolsPage() {
                   value={editingSchool.schoolName}
                   onChange={(e) => setEditingSchool({ ...editingSchool, schoolName: e.target.value })}
                   placeholder="e.g. School of Business and Technology"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 />
               </div>
               
@@ -320,7 +464,7 @@ export default function SchoolsPage() {
                 <select
                   value={editingSchool.status}
                   onChange={(e) => setEditingSchool({ ...editingSchool, status: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                  className="w-full px-4 py-2 rounded-[5px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
@@ -331,22 +475,23 @@ export default function SchoolsPage() {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm hover:shadow transition-all disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-[5px] shadow-sm hover:shadow transition-all disabled:opacity-50"
                 >
-                  {submitting ? 'Saving...' : 'Save Changes'}
+                  {submitting ? 'Updating...' : 'Update School'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -362,18 +507,16 @@ export default function SchoolsPage() {
             </div>
             <div className="px-6 py-4 bg-background border-t border-border flex gap-3 justify-end">
               <button
-                type="button"
-                onClick={() => { setIsDeleteModalOpen(false); setDeletingId(null); }}
-                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-lg transition-colors"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleDelete}
-                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-red-600 rounded-lg shadow-sm hover:shadow transition-all"
+                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-danger/90 rounded-[5px] shadow-sm hover:shadow transition-all"
               >
-                Yes, Delete
+                Delete
               </button>
             </div>
           </div>

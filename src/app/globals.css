@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #f8f9fc;
+  --color-background: #f3f2ef;
   --color-foreground: #1a1d29;
   --color-surface: #ffffff;
   --color-surface-hover: #f1f3f9;
@@ -10,11 +10,11 @@
   --color-muted: #6b7294;
   --color-muted-light: #9ca3c4;
 
-  /* Primary - Sharda Blue */
-  --color-primary: #004b93;
-  --color-primary-hover: #003a73;
-  --color-primary-light: #e6f0fa;
-  --color-primary-lighter: #f0f6ff;
+  /* Primary - LinkedIn Blue */
+  --color-primary: #0a66c2;
+  --color-primary-hover: #004182;
+  --color-primary-light: #ebf4fd;
+  --color-primary-lighter: #f4faff;
 
   /* Accent palette */
   --color-success: #10b981;
@@ -83,7 +83,7 @@ body {
   }
 }
 
-/* Enforce consistent 5px border radius on form elements */
+/* Enforce consistent 5px border radius on form elements and buttons */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -97,6 +97,10 @@ input[type="week"],
 input[type="time"],
 input[type="datetime-local"],
 textarea,
-select {
+select,
+button,
+[type="button"],
+[type="submit"],
+[role="button"] {
   border-radius: 5px !important;
 }

@@ -1,195 +1,333 @@
 'use client';
 
-import { useState } from 'react';
-import { roles, permissionLabels, type Role } from '@/data/mock';
-import { cn } from '@/lib/utils';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Shield, Edit, Trash2, X, Plus } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { formatRoleName } from '@/lib/utils';
 import {
-  Shield,
-  Plus,
-  Users,
-  Pencil,
-  Crown,
-  ShieldCheck,
-  BookOpen,
-  UserCircle,
-} from 'lucide-react';
-
-const roleIcons: Record<string, typeof Shield> = {
-  Administrator: Crown,
-  Editor: ShieldCheck,
-  Author: BookOpen,
-  Subscriber: UserCircle,
-};
-
-const roleColors: Record<string, { bg: string; text: string; badge: string }> = {
-  Administrator: {
-    bg: 'bg-primary-light',
-    text: 'text-primary',
-    badge: 'bg-primary/10 text-primary',
-  },
-  Editor: {
-    bg: 'bg-info-light',
-    text: 'text-info',
-    badge: 'bg-info/10 text-info',
-  },
-  Author: {
-    bg: 'bg-success-light',
-    text: 'text-success',
-    badge: 'bg-success/10 text-success',
-  },
-  Subscriber: {
-    bg: 'bg-warning-light',
-    text: 'text-warning',
-    badge: 'bg-warning/10 text-warning',
-  },
-};
-
-function PermissionToggle({
-  enabled,
-  onChange,
-}: {
-  enabled: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <button
-      role="switch"
-      aria-checked={enabled}
-      onClick={onChange}
-      className={cn(
-        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 shrink-0',
-        enabled ? 'bg-primary' : 'bg-border'
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
-          enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-        )}
-      />
-    </button>
-  );
-}
-
-function RoleCard({ role }: { role: Role }) {
-  const [permissions, setPermissions] = useState(role.permissions);
-  const RoleIcon = roleIcons[role.name] || Shield;
-  const colors = roleColors[role.name] || roleColors['Subscriber'];
-
-  const togglePermission = (key: string) => {
-    setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const enabledCount = Object.values(permissions).filter(Boolean).length;
-  const totalCount = Object.keys(permissions).length;
-
-  return (
-    <div className="bg-surface rounded-xl border border-border shadow-xs hover:shadow-sm transition-all duration-200 overflow-hidden group">
-      {/* Header */}
-      <div className="p-5 border-b border-border-light">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                'h-10 w-10 rounded-lg flex items-center justify-center transition-transform duration-200 group-hover:scale-110',
-                colors.bg,
-                colors.text
-              )}
-            >
-              <RoleIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-foreground">
-                {role.name}
-              </h3>
-              <p className="text-xs text-muted mt-0.5">{role.description}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
-                colors.badge
-              )}
-            >
-              <Users className="h-3 w-3" />
-              {role.usersCount} users
-            </span>
-          </div>
-        </div>
-        {/* Permission progress */}
-        <div className="mt-3 flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-primary to-primary-hover rounded-full transition-all duration-500"
-              style={{ width: `${(enabledCount / totalCount) * 100}%` }}
-            />
-          </div>
-          <span className="text-xs text-muted font-medium">
-            {enabledCount}/{totalCount}
-          </span>
-        </div>
-      </div>
-
-      {/* Permissions grid */}
-      <div className="p-5">
-        <div className="grid grid-cols-2 gap-3">
-          {Object.entries(permissions).map(([key, value]) => (
-            <div
-              key={key}
-              className={cn(
-                'flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg transition-colors duration-150',
-                value ? 'bg-primary-lighter' : 'bg-background'
-              )}
-            >
-              <span className="text-sm text-foreground">
-                {permissionLabels[key] || key}
-              </span>
-              <PermissionToggle
-                enabled={value}
-                onChange={() => togglePermission(key)}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-5 py-3.5 border-t border-border-light bg-background/50">
-        <button className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover transition-colors">
-          <Pencil className="h-3.5 w-3.5" />
-          Edit Role
-        </button>
-      </div>
-    </div>
-  );
-}
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  useReactTable,
+  ColumnDef,
+} from '@tanstack/react-table';
+import { useLayoutStore } from '@/store/useLayoutStore';
 
 export default function RolesPage() {
+  const setHeader = useLayoutStore((state) => state.setHeader);
+  const resetHeader = useLayoutStore((state) => state.resetHeader);
+
+  const [roles, setRoles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modals state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  const [submitting, setSubmitting] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    description: ''
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const openAddModal = useCallback(() => {
+    setFormData({ id: '', name: '', description: '' });
+    setIsModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    setHeader(
+      "User Types (Roles)",
+      "Manage system roles and their configurations",
+      <button 
+        onClick={openAddModal}
+        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-[5px] text-sm font-semibold transition-all duration-200 shadow-sm"
+      >
+        <Plus className="w-4 h-4" />
+        Add Role
+      </button>
+    );
+    return () => resetHeader();
+  }, [setHeader, resetHeader, openAddModal]);
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/roles');
+      const data = await res.json();
+      if (res.ok) {
+        setRoles(data.roles);
+      } else {
+        toast.error(data.error || 'Failed to load roles');
+      }
+    } catch (err) {
+      toast.error('Error fetching data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // openAddModal is now defined above
+
+  const openEditModal = (role: any) => {
+    setFormData({
+      id: role.id,
+      name: formatRoleName(role.name),
+      description: role.description || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const confirmDelete = (id: string) => {
+    setDeletingId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const isEdit = isEditModalOpen;
+      const url = isEdit ? `/api/roles/${formData.id}` : '/api/roles';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to save role');
+      } else {
+        toast.success(isEdit ? 'Role updated successfully' : 'Role created successfully');
+        setIsModalOpen(false);
+        setIsEditModalOpen(false);
+        fetchData();
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    try {
+      const res = await fetch(`/api/roles/${deletingId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete');
+      toast.success('Role deleted successfully');
+      fetchData();
+    } catch (e: any) {
+      toast.error(e.message || 'Could not delete role');
+    } finally {
+      setIsDeleteModalOpen(false);
+      setDeletingId(null);
+    }
+  };
+
+  const columns = useMemo<ColumnDef<any>[]>(
+    () => [
+      {
+        accessorFn: (row) => row.name,
+        id: 'name',
+        header: () => <div className="uppercase">Role Name</div>,
+        cell: ({ row }) => {
+          const role = row.original;
+          return (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{formatRoleName(role.name)}</p>
+                <p className="text-xs text-muted font-mono">{role.name}</p>
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        accessorFn: (row) => row.description,
+        id: 'description',
+        header: () => <div className="uppercase">Description</div>,
+        cell: ({ getValue }) => <span className="text-sm text-muted line-clamp-2">{getValue() as string || '-'}</span>,
+      },
+      {
+        accessorFn: (row) => row._count?.users || 0,
+        id: 'users',
+        header: () => <div className="uppercase">Assigned Users</div>,
+        cell: ({ getValue }) => (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-[5px] text-xs font-semibold bg-surface-hover border border-border">
+            {getValue() as number} users
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: () => <div className="text-right uppercase">Actions</div>,
+        cell: ({ row }) => {
+          const role = row.original;
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <button 
+                onClick={() => openEditModal(role)}
+                className="p-2 text-muted hover:text-primary transition-colors rounded-[5px] hover:bg-primary-light"
+                title="Edit Role"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => confirmDelete(role.id)}
+                className="p-2 text-muted hover:text-danger transition-colors rounded-[5px] hover:bg-danger-light"
+                title="Delete Role"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )
+        },
+      }
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: roles,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
+
+  if (loading) {
+    return <div className="p-6 text-center text-muted text-sm">Loading roles...</div>;
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Roles & Permissions
-          </h1>
-          <p className="text-sm text-muted mt-1">
-            Manage user roles and access control
-          </p>
+      {/* Header is now handled by useLayoutStore */}
+
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-border bg-background/50">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="text-left text-xs font-semibold text-muted tracking-wider px-5 py-3.5">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border-light last:border-b-0 hover:bg-background/60">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-5 py-4">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    No roles found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-        <button className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium text-sm shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98]">
-          <Plus className="h-4 w-4" />
-          Create Role
-        </button>
       </div>
 
-      {/* Roles Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {roles.map((role) => (
-          <RoleCard key={role.id} role={role} />
-        ))}
-      </div>
+      {/* Add / Edit Role Modal */}
+      {(isModalOpen || isEditModalOpen) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-surface w-full max-w-md rounded-xl shadow-xl overflow-hidden border border-border flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <Shield className="w-5 h-5 text-primary" />
+                {isEditModalOpen ? 'Edit Role' : 'Create New Role'}
+              </h2>
+              <button onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }} className="text-muted hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Role Name</label>
+                  <input required type="text" placeholder="e.g. System Admin" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 border border-border rounded-[5px] placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" />
+                  <p className="text-xs text-muted mt-1.5">Will be automatically formatted to uppercase with underscores (e.g., SYSTEM_ADMIN).</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Description (Optional)</label>
+                  <textarea placeholder="Briefly describe the purpose of this role..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={3} className="w-full px-4 py-2 border border-border rounded-[5px] placeholder:text-muted bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm resize-none" />
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-border bg-surface shrink-0 flex justify-end gap-3">
+                <button type="button" onClick={() => { setIsModalOpen(false); setIsEditModalOpen(false); }} className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors">Cancel</button>
+                <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-hover rounded-[5px] shadow-sm hover:shadow transition-all disabled:opacity-50">
+                  {submitting ? 'Saving...' : (isEditModalOpen ? 'Save Changes' : 'Create Role')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface w-full max-w-sm rounded-xl shadow-xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 bg-danger-light text-danger rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Confirm Deletion</h3>
+              <p className="text-sm text-muted">
+                Are you sure you want to delete this role?
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-background border-t border-border flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setIsDeleteModalOpen(false); setDeletingId(null); }}
+                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground bg-surface-hover hover:bg-border-light rounded-[5px] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm font-semibold text-white bg-danger hover:bg-red-600 rounded-[5px] shadow-sm hover:shadow transition-all"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

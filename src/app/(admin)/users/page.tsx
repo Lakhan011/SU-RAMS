@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { cn, timeAgo } from '@/lib/utils';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { cn, timeAgo, formatRoleName } from '@/lib/utils';
 import {
   UserPlus,
   Search,
@@ -9,23 +9,39 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  ArrowUpDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-const ITEMS_PER_PAGE = 10;
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  ColumnDef,
+  SortingState,
+} from '@tanstack/react-table';
+import { useLayoutStore } from '@/store/useLayoutStore';
 
 export default function UsersPage() {
+  const setHeader = useLayoutStore((state) => state.setHeader);
+  const resetHeader = useLayoutStore((state) => state.resetHeader);
+
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Filters
   const [roleFilter, setRoleFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [globalFilter, setGlobalFilter] = useState('');
+  
+  // Table state
+  const [sorting, setSorting] = useState<SortingState>([]);
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -69,7 +85,8 @@ export default function UsersPage() {
     }
   };
 
-  const filtered = useMemo(() => {
+  // Pre-filter data for dropdowns (Role and School) before passing to TanStack Table
+  const filteredData = useMemo(() => {
     let list = users;
     if (roleFilter !== 'all') {
       list = list.filter((u) => u.role?.name === roleFilter);
@@ -77,23 +94,8 @@ export default function UsersPage() {
     if (schoolFilter !== 'all') {
       list = list.filter((u) => u.school?.id === schoolFilter);
     }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (u) =>
-          u.name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q)
-      );
-    }
     return list;
-  }, [users, roleFilter, schoolFilter, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  }, [users, roleFilter, schoolFilter]);
 
   const handleRoleChange = (roleId: string) => {
     setFormData(prev => ({ ...prev, roleId, schoolId: '', departmentId: '' }));
@@ -103,10 +105,25 @@ export default function UsersPage() {
   const needsSchool = selectedRole && (['DEAN', 'COORDINATOR', 'HOD', 'SUPERVISOR'].includes(selectedRole.name));
   const needsDepartment = selectedRole && (['HOD', 'SUPERVISOR'].includes(selectedRole.name));
 
-  const openAddModal = () => {
+  const openAddModal = useCallback(() => {
     setFormData({ id: '', name: '', email: '', password: '', roleId: '', schoolId: '', departmentId: '' });
     setIsModalOpen(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    setHeader(
+      "System Users",
+      `${filteredData.length} total users`,
+      <button 
+        onClick={openAddModal}
+        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-[5px] text-sm font-semibold transition-all duration-200 shadow-sm"
+      >
+        <UserPlus className="w-4 h-4" />
+        Add User
+      </button>
+    );
+    return () => resetHeader();
+  }, [setHeader, resetHeader, openAddModal, filteredData.length]);
 
   const openEditModal = (user: any) => {
     setFormData({
@@ -171,6 +188,134 @@ export default function UsersPage() {
     }
   };
 
+  const columns = useMemo<ColumnDef<any>[]>(
+    () => [
+      {
+        accessorFn: (row) => row.name,
+        id: 'name',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Name
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{user.name}</p>
+                <p className="text-xs text-muted">{user.email}</p>
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        accessorFn: (row) => row.role?.name,
+        id: 'role',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Role
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ row }) => {
+          const roleName = row.original.role?.name || '';
+          return (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-light text-primary">
+              {formatRoleName(roleName)}
+            </span>
+          )
+        },
+      },
+      {
+        accessorFn: (row) => row.department?.departmentName || row.school?.schoolName || 'University',
+        id: 'association',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Association
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ getValue }) => <span className="text-sm text-muted">{getValue() as string}</span>,
+      },
+      {
+        accessorFn: (row) => new Date(row.createdAt).toLocaleDateString(),
+        id: 'joined',
+        header: ({ column }) => {
+          return (
+            <button
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+              className="flex items-center gap-1 hover:text-foreground transition-colors uppercase w-full"
+            >
+              Joined
+              <ArrowUpDown className="ml-1 h-3 w-3" />
+            </button>
+          )
+        },
+        cell: ({ getValue }) => <span className="text-sm text-muted">{getValue() as string}</span>,
+      },
+      {
+        id: 'actions',
+        header: () => <div className="text-right uppercase">Actions</div>,
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <button 
+                onClick={() => openEditModal(user)}
+                className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => confirmDelete(user.id)}
+                className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )
+        },
+      }
+    ],
+    [] // No dependencies since state updates happen via row.original
+  );
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
   const uniqueRoles = Array.from(new Set(users.map(u => u.role?.name))).filter(Boolean);
 
   if (loading) {
@@ -179,29 +324,13 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">System Users</h1>
-          <p className="text-sm text-muted mt-1">
-            {users.length} total users
-          </p>
-        </div>
-        <button 
-          onClick={openAddModal}
-          className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add User
-        </button>
-      </div>
+      {/* Header is handled by useLayoutStore */}
+
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <div className="relative w-full sm:w-64">
           <select
             value={schoolFilter}
-            onChange={(e) => {
-              setSchoolFilter(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setSchoolFilter(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
           >
             <option value="all">All Schools</option>
@@ -215,19 +344,17 @@ export default function UsersPage() {
             <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </div>
         </div>
+        
         <div className="relative w-full sm:w-64">
           <select
             value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setRoleFilter(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
           >
             <option value="all">All Roles</option>
             {uniqueRoles.map((role: any) => (
               <option key={role} value={role}>
-                {role.replace('_', ' ')}
+                {formatRoleName(role)}
               </option>
             ))}
           </select>
@@ -241,8 +368,8 @@ export default function UsersPage() {
           <input
             type="text"
             placeholder="Search by name or email..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            value={globalFilter ?? ''}
+            onChange={(e) => setGlobalFilter(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-surface text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -252,67 +379,66 @@ export default function UsersPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border bg-background/50">
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">Name</th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">Role</th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">Association</th>
-                <th className="text-left text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">Joined</th>
-                <th className="text-right text-xs font-semibold text-muted uppercase tracking-wider px-5 py-3.5">Actions</th>
-              </tr>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-border bg-background/50">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="text-left text-xs font-semibold text-muted tracking-wider px-5 py-3.5">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
             <tbody>
-              {paged.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-16 text-muted text-sm">No users found</td>
-                </tr>
-              ) : (
-                paged.map((user) => (
-                  <tr key={user.id} className="border-b border-border-light last:border-b-0 hover:bg-background/60">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
-                          {user.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{user.name}</p>
-                          <p className="text-xs text-muted">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-light text-primary">
-                        {user.role?.name.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-sm text-muted">
-                      {user.department?.departmentName || user.school?.schoolName || 'University'}
-                    </td>
-                    <td className="px-5 py-4 text-sm text-muted">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => openEditModal(user)}
-                          className="p-2 text-muted hover:text-primary transition-colors rounded-lg hover:bg-primary-light"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => confirmDelete(user.id)}
-                          className="p-2 text-muted hover:text-danger transition-colors rounded-lg hover:bg-danger-light"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border-light last:border-b-0 hover:bg-background/60">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-5 py-4">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="text-center py-16 text-muted text-sm">
+                    No results.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-        {/* Pagination Details (optional depending on needs) */}
+        
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border bg-background/30">
+          <div className="text-sm text-muted">
+            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            {table.getPageCount() || 1}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="p-2 rounded-lg border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="p-2 rounded-lg border border-border hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Add / Edit User Modal */}
@@ -348,7 +474,7 @@ export default function UsersPage() {
                   <select required value={formData.roleId} onChange={e => handleRoleChange(e.target.value)} className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
                     <option value="">Select Role</option>
                     {roles.map(r => (
-                      <option key={r.id} value={r.id}>{r.name.replace('_', ' ')}</option>
+                      <option key={r.id} value={r.id}>{formatRoleName(r.name)}</option>
                     ))}
                   </select>
                 </div>
